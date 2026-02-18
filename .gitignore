@@ -1,0 +1,35 @@
+# 環境変数・機密情報
+.env
+.env.*
+*.key
+*.pem
+credentials/
+*credentials*.json
+*secret*.json
+tokens.json
+.mcp.json
+
+# APIキー・トークンを含む可能性のあるファイル
+*.token
+*.secret
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ・IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js
+node_modules/
+package-lock.json
+
+# 一時ファイル
+*.tmp
+*.bak
+*.log
