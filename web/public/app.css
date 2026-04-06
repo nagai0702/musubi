@@ -239,7 +239,9 @@ dialog menu button.primary { border-color: var(--accent); }
   background: var(--accent-light); color: var(--accent-dark);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 18px; flex-shrink: 0;
+  object-fit: cover;
 }
+#presentList img.avatar { background: none; }
 #presentList li small { color: var(--success); font-weight: 600; }
 .empty-card { text-align: center; color: var(--muted); padding: 32px; background: var(--card); border-radius: 12px; }
 

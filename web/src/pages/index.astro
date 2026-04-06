@@ -158,7 +158,10 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         $('#presentCount').textContent = present.length;
         $('#presentList').innerHTML = present.length ? present.map(r => {
           const since = r.date === today ? `出勤 ${r.time}` : `${r.date} ${r.time} から`;
-          return `<li><span class="avatar">${r.userName.charAt(0)}</span><div><b>${r.userName}</b><br><small>${since}</small></div></li>`;
+          const avatar = r.image
+            ? `<img class="avatar" src="${r.image}" alt="">`
+            : `<span class="avatar">${(r.userName || '?').charAt(0)}</span>`;
+          return `<li>${avatar}<div><b>${r.userName}</b><br><small>${since}</small></div></li>`;
         }).join('') : '<li class="empty-card">在席者なし</li>';
       }
       async function loadRoomsAndVisitors() {

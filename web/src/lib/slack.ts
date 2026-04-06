@@ -44,6 +44,35 @@ export async function exchangeCode(code: string) {
   };
 }
 
+/** Slack ユーザー情報をキャッシュ付きで取得 */
+const userCache = new Map<string, { name: string; image: string; cachedAt: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1時間
+
+export async function getSlackUser(userId: string): Promise<{ name: string; image: string }> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  if (!token || !userId) return { name: '', image: '' };
+  const cached = userCache.get(userId);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL) {
+    return { name: cached.name, image: cached.image };
+  }
+  try {
+    const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json() as any;
+    if (!data.ok) return { name: '', image: '' };
+    const p = data.user.profile || {};
+    const info = {
+      name: p.real_name || data.user.real_name || data.user.name || '',
+      image: p.image_192 || p.image_72 || p.image_48 || ''
+    };
+    userCache.set(userId, { ...info, cachedAt: Date.now() });
+    return info;
+  } catch {
+    return { name: '', image: '' };
+  }
+}
+
 /** #attendance チャンネルにメッセージ投稿 */
 export async function postToAttendanceChannel(text: string): Promise<void> {
   const token = import.meta.env.SLACK_BOT_TOKEN;
