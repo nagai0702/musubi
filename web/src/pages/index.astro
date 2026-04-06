@@ -154,15 +154,12 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
       }
       async function loadPresent() {
         const today = fmtDate(new Date());
-        const att = await fetch('/api/attendance?date=' + today).then(r => r.json());
-        // APIは時刻昇順で返すので、各userIdの最後のレコードを採用
-        const byUser = {};
-        att.forEach(r => { byUser[r.userId] = r; });
-        const present = Object.values(byUser).filter(r => r.type === 'in').sort((a,b) => a.time.localeCompare(b.time));
+        const present = await fetch('/api/present').then(r => r.json());
         $('#presentCount').textContent = present.length;
-        $('#presentList').innerHTML = present.length ? present.map(r =>
-          `<li><span class="avatar">${r.userName.charAt(0)}</span><div><b>${r.userName}</b><br><small>出勤 ${r.time}</small></div></li>`
-        ).join('') : '<li class="empty-card">在席者なし</li>';
+        $('#presentList').innerHTML = present.length ? present.map(r => {
+          const since = r.date === today ? `出勤 ${r.time}` : `${r.date} ${r.time} から`;
+          return `<li><span class="avatar">${r.userName.charAt(0)}</span><div><b>${r.userName}</b><br><small>${since}</small></div></li>`;
+        }).join('') : '<li class="empty-card">在席者なし</li>';
       }
       async function loadRoomsAndVisitors() {
         const days = next5Days();

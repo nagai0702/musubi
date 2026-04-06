@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getAttendance, addAttendance } from '@/lib/sheets';
+import { getAttendance, addAttendance, getLatestPerUser } from '@/lib/sheets';
 import { getSession } from '@/lib/session';
 import { postToAttendanceChannel } from '@/lib/slack';
 
@@ -23,15 +23,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return new Response(JSON.stringify({ error: 'invalid type' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 
-  // 当日の最新打刻を確認
-  const today = todayJST();
-  const records = await getAttendance(today);
-  const mine = records.filter(r => r.userId === user.id);
-  const last = mine.length ? mine[mine.length - 1] : null;
-  if (last && last.type === type) {
+  // 全期間の最新打刻を確認（日またぎ対応）
+  const latest = (await getLatestPerUser())[user.id];
+  if (latest && latest.type === type) {
+    const when = latest.date === todayJST() ? latest.time : `${latest.date} ${latest.time}`;
     const msg = type === 'in'
-      ? `すでに出勤済みです (${last.time})`
-      : `すでに退勤済みです (${last.time})`;
+      ? `すでに出勤済みです (${when})`
+      : `すでに退勤済みです (${when})`;
     return new Response(JSON.stringify({ error: msg }), { status: 409, headers: { 'Content-Type': 'application/json' } });
   }
 

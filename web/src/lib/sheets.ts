@@ -95,6 +95,27 @@ export async function addAttendance(userId: string, userName: string, type: 'in'
   await append('Attendance!A:E', [nowJSTString(), userId, userName, type, source]);
 }
 
+/** 全打刻履歴を時系列で取得（在席判定・最新打刻判定用） */
+export type AttendanceFullRow = AttendanceRow & { date: string };
+export async function getAllAttendance(): Promise<AttendanceFullRow[]> {
+  const rows = await read('Attendance!A2:E');
+  return rows
+    .map(r => {
+      const { date, time } = toJST(r[0] || '');
+      return { date, time, userId: r[1] || '', userName: r[2] || '', type: (r[3] as 'in' | 'out') || 'in' };
+    })
+    .filter(r => r.date)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+
+/** 各ユーザーの最新打刻を返す */
+export async function getLatestPerUser(): Promise<Record<string, AttendanceFullRow>> {
+  const all = await getAllAttendance();
+  const map: Record<string, AttendanceFullRow> = {};
+  for (const r of all) map[r.userId] = r;
+  return map;
+}
+
 /* ===== Bookings ===== */
 export type Booking = { id: string; date: string; room: string; start: string; end: string; title: string; userId: string; userName: string; };
 
