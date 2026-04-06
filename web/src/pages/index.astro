@@ -1,0 +1,188 @@
+---
+import { getSession } from '@/lib/session';
+const user = getSession(Astro.cookies);
+const ROOMS = ['会議室', '撮影部屋', '洗面所'];
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>結び 勤怠 & 会議室</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+{!user ? (
+  <div class="login">
+    <h1>結び 勤怠 & 会議室</h1>
+    <a class="primary" href="/api/auth/slack/login">Slackでログイン</a>
+  </div>
+) : (
+  <>
+    <header>
+      <h1>結び 勤怠 & 会議室</h1>
+      <div class="user">
+        👤 {user.name}
+        <form method="POST" action="/api/auth/slack/logout" style="display:inline">
+          <button class="link">ログアウト</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="punch">
+      <button id="punchIn" class="primary">出勤</button>
+      <button id="punchOut" class="primary danger">退勤</button>
+    </div>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="attendance">出勤ログ</button>
+      <button class="tab" data-tab="rooms">会議室予約</button>
+      <button class="tab" data-tab="visitors">来客</button>
+    </nav>
+
+    <div class="datebar">
+      <button id="prevDay">◀</button>
+      <input type="date" id="dateInput">
+      <button id="nextDay">▶</button>
+    </div>
+
+    <section id="tab-attendance" class="panel active">
+      <table id="attendanceTable">
+        <thead><tr><th>時刻</th><th>名前</th><th>区分</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="tab-rooms" class="panel">
+      <div class="grid-wrap"><table id="roomGrid"></table></div>
+      <button id="newBookingBtn" class="fab">+ 予約</button>
+    </section>
+
+    <section id="tab-visitors" class="panel">
+      <ul id="visitorList"></ul>
+      <button id="newVisitorBtn" class="fab">+ 来客</button>
+    </section>
+
+    <dialog id="bookingDialog">
+      <form method="dialog">
+        <h3>会議室を予約</h3>
+        <label>部屋
+          <select name="room">{ROOMS.map(r => <option>{r}</option>)}</select>
+        </label>
+        <label>開始 <input type="time" name="start" step="900" required></label>
+        <label>終了 <input type="time" name="end" step="900" required></label>
+        <label>用件 <input type="text" name="title" required></label>
+        <menu>
+          <button value="cancel">キャンセル</button>
+          <button id="bookingSubmit" value="ok" class="primary">予約</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="visitorDialog">
+      <form method="dialog">
+        <h3>来客を登録</h3>
+        <label>時刻 <input type="time" name="time" step="900" required></label>
+        <label>お名前 <input type="text" name="name" required></label>
+        <label>会社名 <input type="text" name="company"></label>
+        <label>用件 <input type="text" name="purpose"></label>
+        <menu>
+          <button value="cancel">キャンセル</button>
+          <button id="visitorSubmit" value="ok" class="primary">登録</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script define:vars={{ ROOMS, USER: { id: user.id, name: user.name } }}>
+      const TYPE_LABEL = { in: '出勤', out: '退勤' };
+      const SLOTS = (() => { const a = []; for (let h = 9; h < 21; h++) for (let m = 0; m < 60; m += 15) a.push(('0'+h).slice(-2)+':'+('0'+m).slice(-2)); return a; })();
+      const $ = s => document.querySelector(s);
+      const fmtDate = d => d.toISOString().slice(0,10);
+      let currentDate = new Date();
+
+      async function loadAll() {
+        const ds = fmtDate(currentDate);
+        const [att, bks, vis] = await Promise.all([
+          fetch('/api/attendance?date=' + ds).then(r => r.json()),
+          fetch('/api/bookings?date=' + ds).then(r => r.json()),
+          fetch('/api/visitors?date=' + ds).then(r => r.json())
+        ]);
+        renderAttendance(att); renderRooms(bks); renderVisitors(vis);
+      }
+      function renderAttendance(rows) {
+        $('#attendanceTable tbody').innerHTML = rows.map(r =>
+          `<tr><td>${r.time}</td><td>${r.userName}</td><td><span class="badge ${r.type}">${TYPE_LABEL[r.type]}</span></td></tr>`
+        ).join('') || '<tr><td colspan="3" style="text-align:center;color:#999">記録なし</td></tr>';
+      }
+      function renderRooms(bookings) {
+        let html = '<thead><tr><th>時刻</th>' + ROOMS.map(r => `<th>${r}</th>`).join('') + '</tr></thead><tbody>';
+        SLOTS.forEach(s => {
+          html += `<tr><td>${s}</td>`;
+          ROOMS.forEach(room => {
+            const hit = bookings.find(b => b.room === room && s >= b.start && s < b.end);
+            if (hit) {
+              const cls = hit.userId === USER.id ? 'mine' : 'booked';
+              html += `<td class="${cls}" data-id="${hit.id}" title="${hit.title}/${hit.userName}">${hit.title}</td>`;
+            } else html += '<td></td>';
+          });
+          html += '</tr>';
+        });
+        $('#roomGrid').innerHTML = html + '</tbody>';
+        $('#roomGrid').querySelectorAll('td.mine').forEach(td => td.onclick = async () => {
+          if (!confirm('予約を削除しますか？')) return;
+          const r = await fetch('/api/bookings?id=' + td.dataset.id, { method: 'DELETE' });
+          if (!r.ok) { alert((await r.json()).error); return; }
+          loadAll();
+        });
+      }
+      function renderVisitors(vs) {
+        $('#visitorList').innerHTML = vs.map(v =>
+          `<li><b>${v.time}</b> ${v.name}${v.company ? ' (' + v.company + ')' : ''}<br><small>用件: ${v.purpose || '-'} / 担当: ${v.host}</small></li>`
+        ).join('') || '<li style="text-align:center;color:#999">来客予定なし</li>';
+      }
+
+      document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+        t.classList.add('active'); $('#tab-' + t.dataset.tab).classList.add('active');
+      });
+      $('#dateInput').value = fmtDate(currentDate);
+      $('#prevDay').onclick = () => { currentDate.setDate(currentDate.getDate()-1); $('#dateInput').value = fmtDate(currentDate); loadAll(); };
+      $('#nextDay').onclick = () => { currentDate.setDate(currentDate.getDate()+1); $('#dateInput').value = fmtDate(currentDate); loadAll(); };
+      $('#dateInput').onchange = e => { currentDate = new Date(e.target.value); loadAll(); };
+
+      async function punch(type) {
+        const r = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) });
+        if (!r.ok) { alert('失敗'); return; }
+        loadAll();
+      }
+      $('#punchIn').onclick = () => punch('in');
+      $('#punchOut').onclick = () => punch('out');
+
+      $('#newBookingBtn').onclick = () => $('#bookingDialog').showModal();
+      $('#bookingSubmit').onclick = async e => {
+        e.preventDefault();
+        const f = $('#bookingDialog').querySelector('form');
+        const fd = new FormData(f);
+        const r = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: fmtDate(currentDate), room: fd.get('room'), start: fd.get('start'), end: fd.get('end'), title: fd.get('title') }) });
+        if (!r.ok) { alert((await r.json()).error); return; }
+        $('#bookingDialog').close(); f.reset(); loadAll();
+      };
+      $('#newVisitorBtn').onclick = () => $('#visitorDialog').showModal();
+      $('#visitorSubmit').onclick = async e => {
+        e.preventDefault();
+        const f = $('#visitorDialog').querySelector('form');
+        const fd = new FormData(f);
+        const r = await fetch('/api/visitors', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: fmtDate(currentDate), time: fd.get('time'), name: fd.get('name'), company: fd.get('company'), purpose: fd.get('purpose') }) });
+        if (!r.ok) { alert('失敗'); return; }
+        $('#visitorDialog').close(); f.reset(); loadAll();
+      };
+
+      loadAll();
+    </script>
+  </>
+)}
+</body>
+</html>

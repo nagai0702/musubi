@@ -1,0 +1,17 @@
+{
+  "name": "yui-attendance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "start": "node ./dist/server/entry.mjs"
+  },
+  "dependencies": {
+    "astro": "^4.16.0",
+    "@astrojs/node": "^8.3.4",
+    "googleapis": "^144.0.0"
+  }
+}
