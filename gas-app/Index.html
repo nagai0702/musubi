@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('Style'); ?>
+</head>
+<body>
+  <header>
+    <h1>結び 勤怠 & 会議室</h1>
+    <div class="user">👤 <?= user.name ?></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="attendance">出勤ログ</button>
+    <button class="tab" data-tab="rooms">会議室予約</button>
+    <button class="tab" data-tab="visitors">来客</button>
+  </nav>
+
+  <div class="datebar">
+    <button id="prevDay">◀</button>
+    <input type="date" id="dateInput">
+    <button id="nextDay">▶</button>
+  </div>
+
+  <section id="tab-attendance" class="panel active">
+    <table id="attendanceTable">
+      <thead><tr><th>時刻</th><th>名前</th><th>区分</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="tab-rooms" class="panel">
+    <div class="grid-wrap">
+      <table id="roomGrid"></table>
+    </div>
+    <button id="newBookingBtn" class="primary">+ 予約を追加</button>
+  </section>
+
+  <section id="tab-visitors" class="panel">
+    <ul id="visitorList"></ul>
+    <button id="newVisitorBtn" class="primary">+ 来客を登録</button>
+  </section>
+
+  <!-- 予約ダイアログ -->
+  <dialog id="bookingDialog">
+    <form method="dialog">
+      <h3>会議室を予約</h3>
+      <label>部屋
+        <select name="room">
+          <? for (var i = 0; i < rooms.length; i++) { ?>
+            <option><?= rooms[i] ?></option>
+          <? } ?>
+        </select>
+      </label>
+      <label>開始 <input type="time" name="start" step="900" required></label>
+      <label>終了 <input type="time" name="end" step="900" required></label>
+      <label>用件 <input type="text" name="title" required></label>
+      <menu>
+        <button value="cancel">キャンセル</button>
+        <button id="bookingSubmit" value="ok" class="primary">予約</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- 来客ダイアログ -->
+  <dialog id="visitorDialog">
+    <form method="dialog">
+      <h3>来客を登録</h3>
+      <label>時刻 <input type="time" name="time" step="900" required></label>
+      <label>お名前 <input type="text" name="name" required></label>
+      <label>会社名 <input type="text" name="company"></label>
+      <label>用件 <input type="text" name="purpose"></label>
+      <menu>
+        <button value="cancel">キャンセル</button>
+        <button id="visitorSubmit" value="ok" class="primary">登録</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <?!= include('App'); ?>
+</body>
+</html>
