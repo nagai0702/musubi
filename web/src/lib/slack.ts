@@ -44,6 +44,18 @@ export async function exchangeCode(code: string) {
   };
 }
 
+/** #attendance チャンネルにメッセージ投稿 */
+export async function postToAttendanceChannel(text: string): Promise<void> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const channel = import.meta.env.SLACK_ATTENDANCE_CHANNEL_ID;
+  if (!token || !channel) return;
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ channel, text })
+  });
+}
+
 /* ===== Attendance polling (出勤/退勤のみ) ===== */
 const KEYWORDS: Record<string, 'in' | 'out'> = { '出勤': 'in', '退勤': 'out' };
 

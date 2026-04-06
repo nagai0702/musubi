@@ -232,7 +232,11 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
 
       async function punch(type) {
         const r = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) });
-        if (!r.ok) { alert('失敗'); return; }
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: '失敗' }));
+          alert(err.error || '失敗');
+          return;
+        }
         loadAttendance(); loadPresent();
       }
       $('#punchIn').onclick = () => punch('in');
