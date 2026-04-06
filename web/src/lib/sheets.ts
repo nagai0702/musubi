@@ -64,8 +64,13 @@ export type AttendanceRow = { time: string; userId: string; userName: string; ty
 /** UTC ISO or JST string -> { date, time } in JST */
 function toJST(raw: string): { date: string; time: string } {
   if (!raw) return { date: '', time: '' };
-  // タイムゾーン情報なしの "YYYY-MM-DD HH:MM:SS" は JST として扱う
-  const d = /[Z+]/.test(raw) ? new Date(raw) : new Date(raw.replace(' ', 'T') + '+09:00');
+  // タイムゾーン情報なしの "YYYY-MM-DD HH:MM:SS" はすでにJSTなのでそのまま分解
+  if (!/[Z+]/.test(raw)) {
+    const [datePart, timePart = ''] = raw.split(/[T ]/);
+    return { date: datePart, time: timePart.slice(0, 5) };
+  }
+  // UTC ISO (Z や +HH:MM 付き) は JST に変換
+  const d = new Date(raw);
   if (isNaN(d.getTime())) return { date: '', time: '' };
   const jst = new Date(d.getTime() + 9 * 3600 * 1000);
   const iso = jst.toISOString();
