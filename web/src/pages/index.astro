@@ -333,8 +333,15 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         ));
         const ok = results.filter(r => r.ok).length;
         const fails = results.filter(r => !r.ok);
-        if (fails.length) {
-          alert(`${ok}件登録。失敗 ${fails.length}件:\n` + fails.map(f => `${f.date}: ${f.error}`).join('\n'));
+        const conflicts = fails.filter(f => f.error && f.error.includes('重複'));
+        const hardFails = fails.filter(f => !f.error || !f.error.includes('重複'));
+        if (hardFails.length) {
+          alert(`${ok}件登録。失敗 ${hardFails.length}件:\n` + hardFails.map(f => `${f.date}: ${f.error}`).join('\n'));
+        } else if (ok > 0) {
+          const msg = conflicts.length
+            ? `${ok}件登録しました。${conflicts.length}件は既存予約と重複のためスキップ。`
+            : `${ok}件登録しました。`;
+          console.log(msg);
         }
         $('#bookingDialog').close(); f.reset(); loadRoomsAndVisitors();
       };

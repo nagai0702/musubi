@@ -14,7 +14,11 @@ export function setSession(cookies: AstroCookies, user: SessionUser) {
   const payload = Buffer.from(JSON.stringify(user)).toString('base64url');
   const sig = sign(payload);
   cookies.set(COOKIE, `${payload}.${sig}`, {
-    httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365, // 1年
+    secure: true
   });
 }
 
