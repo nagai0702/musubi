@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-astro",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "port": 4321
+    },
+    {
+      "name": "gas-app-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "gas-app/preview", "-p", "8000", "-c-1"],
+      "port": 8000
+    }
+  ]
+}

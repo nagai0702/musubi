@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>結び 勤怠 & 会議室 (Preview)</title>
+<style>
+  :root { --bg:#f7f7f8; --fg:#222; --accent:#2b6cb0; --border:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin:0; background:var(--bg); color:var(--fg); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#fff; border-bottom:1px solid var(--border); }
+  h1 { font-size:18px; margin:0; }
+  .user { font-size:13px; color:#555; }
+  .tabs { display:flex; background:#fff; border-bottom:1px solid var(--border); }
+  .tab { flex:1; padding:12px; border:none; background:none; font-size:14px; cursor:pointer; border-bottom:3px solid transparent; }
+  .tab.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .datebar { display:flex; gap:8px; padding:12px 16px; align-items:center; }
+  .datebar input { flex:1; padding:6px; }
+  .datebar button { padding:6px 12px; }
+  .panel { display:none; padding:0 16px 80px; }
+  .panel.active { display:block; }
+  table { width:100%; border-collapse:collapse; background:#fff; }
+  th, td { padding:8px; border-bottom:1px solid var(--border); text-align:left; font-size:14px; }
+  th { background:#fafafa; font-weight:600; }
+  .grid-wrap { overflow-x:auto; background:#fff; border:1px solid var(--border); border-radius:6px; }
+  #roomGrid td { min-width:80px; height:24px; text-align:center; font-size:11px; cursor:pointer; }
+  #roomGrid td.booked { background:#bee3f8; }
+  #roomGrid td.mine { background:#9ae6b4; }
+  .primary { background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:6px; font-size:14px; cursor:pointer; position:fixed; bottom:16px; right:16px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+  ul { list-style:none; padding:0; }
+  li { background:#fff; padding:12px; margin:8px 0; border-radius:6px; border:1px solid var(--border); }
+  dialog { border:none; border-radius:8px; padding:20px; width:90%; max-width:400px; }
+  dialog label { display:block; margin:10px 0; font-size:13px; }
+  dialog input, dialog select { width:100%; padding:8px; margin-top:4px; font-size:14px; }
+  dialog menu { display:flex; gap:8px; justify-content:flex-end; padding:0; margin-top:16px; }
+  dialog menu button { padding:8px 16px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#edf2f7; }
+  .badge.in { background:#c6f6d5; }
+  .badge.out { background:#fed7d7; }
+  .preview-banner { background:#fffbe6; border-bottom:1px solid #f0d000; padding:6px 16px; font-size:12px; color:#8a6d00; text-align:center; }
+</style>
+</head>
+<body>
+  <div class="preview-banner">⚠ プレビュー版（モックデータ表示・GAS連携なし）</div>
+  <header>
+    <h1>結び 勤怠 & 会議室</h1>
+    <div class="user">👤 山田 太郎</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="attendance">出勤ログ</button>
+    <button class="tab" data-tab="rooms">会議室予約</button>
+    <button class="tab" data-tab="visitors">来客</button>
+  </nav>
+
+  <div class="datebar">
+    <button id="prevDay">◀</button>
+    <input type="date" id="dateInput">
+    <button id="nextDay">▶</button>
+  </div>
+
+  <section id="tab-attendance" class="panel active">
+    <table id="attendanceTable">
+      <thead><tr><th>時刻</th><th>名前</th><th>区分</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="tab-rooms" class="panel">
+    <div class="grid-wrap"><table id="roomGrid"></table></div>
+    <button id="newBookingBtn" class="primary">+ 予約を追加</button>
+  </section>
+
+  <section id="tab-visitors" class="panel">
+    <ul id="visitorList"></ul>
+    <button id="newVisitorBtn" class="primary">+ 来客を登録</button>
+  </section>
+
+  <dialog id="bookingDialog">
+    <form method="dialog">
+      <h3>会議室を予約</h3>
+      <label>部屋
+        <select name="room">
+          <option>会議室</option><option>撮影部屋</option><option>洗面所</option>
+        </select>
+      </label>
+      <label>開始 <input type="time" name="start" step="900" required></label>
+      <label>終了 <input type="time" name="end" step="900" required></label>
+      <label>用件 <input type="text" name="title" required></label>
+      <menu>
+        <button value="cancel">キャンセル</button>
+        <button value="ok" class="primary" style="position:static">予約</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="visitorDialog">
+    <form method="dialog">
+      <h3>来客を登録</h3>
+      <label>時刻 <input type="time" name="time" step="900" required></label>
+      <label>お名前 <input type="text" name="name" required></label>
+      <label>会社名 <input type="text" name="company"></label>
+      <label>用件 <input type="text" name="purpose"></label>
+      <menu>
+        <button value="cancel">キャンセル</button>
+        <button value="ok" class="primary" style="position:static">登録</button>
+      </menu>
+    </form>
+  </dialog>
+
+<script>
+const TYPE_LABEL = { in:'出勤', out:'退勤', break_start:'休憩開始', break_end:'休憩終了', away:'外出', back:'戻り' };
+const ROOMS = ['会議室','撮影部屋','洗面所'];
+const USER = { id:'U001', name:'山田 太郎' };
+const SLOTS = (() => { const a=[]; for(let h=9;h<21;h++) for(let m=0;m<60;m+=15) a.push(('0'+h).slice(-2)+':'+('0'+m).slice(-2)); return a; })();
+
+const MOCK_ATTENDANCE = [
+  { time:'09:02', userName:'山田 太郎', type:'in' },
+  { time:'09:15', userName:'佐藤 花子', type:'in' },
+  { time:'09:48', userName:'鈴木 一郎', type:'in' },
+  { time:'12:05', userName:'山田 太郎', type:'break_start' },
+  { time:'12:58', userName:'山田 太郎', type:'break_end' },
+  { time:'14:30', userName:'佐藤 花子', type:'away' },
+  { time:'15:20', userName:'佐藤 花子', type:'back' },
+  { time:'18:10', userName:'鈴木 一郎', type:'out' },
+];
+const MOCK_BOOKINGS = [
+  { id:'b1', room:'会議室', start:'10:00', end:'11:00', title:'定例MTG', userId:'U002', userName:'佐藤' },
+  { id:'b2', room:'会議室', start:'14:00', end:'15:30', title:'採用面接', userId:'U001', userName:'山田' },
+  { id:'b3', room:'撮影部屋', start:'13:00', end:'14:30', title:'カウンセリング動画', userId:'U003', userName:'鈴木' },
+  { id:'b4', room:'洗面所', start:'11:30', end:'12:00', title:'メイク直し', userId:'U002', userName:'佐藤' },
+];
+const MOCK_VISITORS = [
+  { time:'13:00', name:'田中 様', company:'(株)ABC', purpose:'業務提携の打合せ', host:'山田 太郎' },
+  { time:'16:00', name:'山本 様', company:'フリーランス', purpose:'撮影立会い', host:'鈴木 一郎' },
+];
+
+const $ = s => document.querySelector(s);
+const fmtDate = d => d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+let currentDate = new Date();
+
+function renderAttendance() {
+  $('#attendanceTable tbody').innerHTML = MOCK_ATTENDANCE.map(r =>
+    `<tr><td>${r.time}</td><td>${r.userName}</td><td><span class="badge ${r.type}">${TYPE_LABEL[r.type]}</span></td></tr>`).join('');
+}
+function renderRooms() {
+  let html = '<thead><tr><th>時刻</th>'+ROOMS.map(r=>`<th>${r}</th>`).join('')+'</tr></thead><tbody>';
+  SLOTS.forEach(s => {
+    html += `<tr><td>${s}</td>`;
+    ROOMS.forEach(room => {
+      const hit = MOCK_BOOKINGS.find(b => b.room===room && s>=b.start && s<b.end);
+      if (hit) {
+        const cls = hit.userId===USER.id ? 'mine' : 'booked';
+        html += `<td class="${cls}" title="${hit.title} / ${hit.userName}">${hit.title}</td>`;
+      } else html += '<td></td>';
+    });
+    html += '</tr>';
+  });
+  $('#roomGrid').innerHTML = html + '</tbody>';
+}
+function renderVisitors() {
+  $('#visitorList').innerHTML = MOCK_VISITORS.map(v =>
+    `<li><b>${v.time}</b> ${v.name} (${v.company})<br><small>用件: ${v.purpose} / 担当: ${v.host}</small></li>`).join('');
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  $('#tab-'+t.dataset.tab).classList.add('active');
+}));
+$('#dateInput').value = fmtDate(currentDate);
+$('#prevDay').onclick = () => { currentDate.setDate(currentDate.getDate()-1); $('#dateInput').value=fmtDate(currentDate); };
+$('#nextDay').onclick = () => { currentDate.setDate(currentDate.getDate()+1); $('#dateInput').value=fmtDate(currentDate); };
+$('#newBookingBtn').onclick = () => $('#bookingDialog').showModal();
+$('#newVisitorBtn').onclick = () => $('#visitorDialog').showModal();
+
+renderAttendance(); renderRooms(); renderVisitors();
+</script>
+</body>
+</html>
