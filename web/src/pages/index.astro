@@ -134,9 +134,9 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
       async function loadPresent() {
         const today = fmtDate(new Date());
         const att = await fetch('/api/attendance?date=' + today).then(r => r.json());
-        // userId ごとに最新を取り、最後が in の人を抽出
+        // APIは時刻昇順で返すので、各userIdの最後のレコードを採用
         const byUser = {};
-        att.forEach(r => { if (!byUser[r.userId] || r.time > byUser[r.userId].time) byUser[r.userId] = r; });
+        att.forEach(r => { byUser[r.userId] = r; });
         const present = Object.values(byUser).filter(r => r.type === 'in').sort((a,b) => a.time.localeCompare(b.time));
         $('#presentCount').textContent = present.length;
         $('#presentList').innerHTML = present.length ? present.map(r =>
