@@ -80,7 +80,7 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
     <dialog id="bookingDialog">
       <form method="dialog">
         <h3 id="bookingTitle">会議室を予約</h3>
-        <label>日付 <select name="date" id="bookingDate"></select></label>
+        <label>日付 <input type="date" name="date" id="bookingDate" required></label>
         <label>部屋
           <select name="room" id="bookingRoom">{ROOMS.map(r => <option>{r}</option>)}</select>
         </label>
@@ -89,6 +89,16 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
           <label style="flex:1">終了 <select name="end" id="bookingEnd"></select></label>
         </div>
         <label>用件 <input type="text" name="title" id="bookingTitleInput" required></label>
+        <label id="recurrenceLabel">繰り返し
+          <select name="recurrence" id="bookingRecurrence">
+            <option value="none">繰り返さない</option>
+            <option value="daily">毎日</option>
+            <option value="weekly">毎週 同じ曜日</option>
+            <option value="weekdays">毎週平日 (月〜金)</option>
+            <option value="monthly">毎月 同じ日</option>
+          </select>
+        </label>
+        <label id="repeatCountLabel" style="display:none">回数 <input type="number" name="repeatCount" id="bookingCount" min="2" max="52" value="4"></label>
         <menu>
           <button id="bookingDeleteBtn" type="button" class="primary danger" style="margin-right:auto;display:none">削除</button>
           <button value="cancel">キャンセル</button>
@@ -220,6 +230,29 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         sel.innerHTML = next5Days().map(d => `<option value="${d}">${labelDate(d)}</option>`).join('');
       }
 
+      /** 再帰日付を展開 */
+      function expandRecurrence(startDate, mode, count) {
+        const dates = [];
+        const d0 = new Date(startDate);
+        if (mode === 'none') return [startDate];
+        if (mode === 'daily') {
+          for (let i = 0; i < count; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i); dates.push(fmtDate(d)); }
+        } else if (mode === 'weekly') {
+          for (let i = 0; i < count; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i * 7); dates.push(fmtDate(d)); }
+        } else if (mode === 'weekdays') {
+          let added = 0; let i = 0;
+          while (added < count) {
+            const d = new Date(d0); d.setDate(d0.getDate() + i);
+            const wd = d.getDay();
+            if (wd >= 1 && wd <= 5) { dates.push(fmtDate(d)); added++; }
+            i++;
+          }
+        } else if (mode === 'monthly') {
+          for (let i = 0; i < count; i++) { const d = new Date(d0); d.setMonth(d0.getMonth() + i); dates.push(fmtDate(d)); }
+        }
+        return dates;
+      }
+
       document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
         document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
@@ -246,9 +279,11 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
 
       let editingBookingId = null;
       function openBookingDialog(b) {
-        fillDateSelect($('#bookingDate'));
         fillSlotSelect($('#bookingStart'), SLOTS);
         fillSlotSelect($('#bookingEnd'), END_SLOTS);
+        $('#bookingRecurrence').value = 'none';
+        $('#bookingCount').value = 4;
+        $('#repeatCountLabel').style.display = 'none';
         if (b) {
           editingBookingId = b.id;
           $('#bookingTitle').textContent = '予約を編集';
@@ -258,25 +293,49 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
           $('#bookingEnd').value = b.end;
           $('#bookingTitleInput').value = b.title;
           $('#bookingDeleteBtn').style.display = 'inline-block';
+          $('#recurrenceLabel').style.display = 'none';
         } else {
           editingBookingId = null;
           $('#bookingTitle').textContent = '会議室を予約';
+          $('#bookingDate').value = fmtDate(new Date());
           $('#bookingDeleteBtn').style.display = 'none';
+          $('#recurrenceLabel').style.display = 'block';
         }
         $('#bookingDialog').showModal();
       }
+
+      $('#bookingRecurrence').onchange = e => {
+        $('#repeatCountLabel').style.display = e.target.value === 'none' ? 'none' : 'block';
+      };
 
       $('#newBookingBtn').onclick = () => openBookingDialog(null);
       $('#bookingSubmit').onclick = async e => {
         e.preventDefault();
         const f = $('#bookingDialog').querySelector('form');
         const fd = new FormData(f);
-        const payload = { date: fd.get('date'), room: fd.get('room'), start: fd.get('start'), end: fd.get('end'), title: fd.get('title') };
-        if (payload.start >= payload.end) { alert('終了は開始より後を選んでください'); return; }
-        const url = editingBookingId ? '/api/bookings?id=' + editingBookingId : '/api/bookings';
-        const method = editingBookingId ? 'PUT' : 'POST';
-        const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!r.ok) { alert((await r.json()).error); return; }
+        const base = { date: fd.get('date'), room: fd.get('room'), start: fd.get('start'), end: fd.get('end'), title: fd.get('title') };
+        if (base.start >= base.end) { alert('終了は開始より後を選んでください'); return; }
+
+        if (editingBookingId) {
+          const r = await fetch('/api/bookings?id=' + editingBookingId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base) });
+          if (!r.ok) { alert((await r.json()).error); return; }
+          $('#bookingDialog').close(); f.reset(); loadRoomsAndVisitors();
+          return;
+        }
+
+        // 新規: 繰り返し対応
+        const mode = fd.get('recurrence') || 'none';
+        const count = parseInt(fd.get('repeatCount') || '1', 10);
+        const dates = expandRecurrence(base.date, mode, mode === 'none' ? 1 : count);
+        const results = await Promise.all(dates.map(d =>
+          fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...base, date: d }) })
+            .then(async r => ({ date: d, ok: r.ok, error: r.ok ? null : (await r.json()).error }))
+        ));
+        const ok = results.filter(r => r.ok).length;
+        const fails = results.filter(r => !r.ok);
+        if (fails.length) {
+          alert(`${ok}件登録。失敗 ${fails.length}件:\n` + fails.map(f => `${f.date}: ${f.error}`).join('\n'));
+        }
         $('#bookingDialog').close(); f.reset(); loadRoomsAndVisitors();
       };
       $('#bookingDeleteBtn').onclick = async () => {
