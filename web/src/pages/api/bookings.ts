@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getBookings, createBooking, deleteBooking } from '@/lib/sheets';
+import { getBookings, createBooking, deleteBooking, updateBooking } from '@/lib/sheets';
 import { getSession } from '@/lib/session';
 
 export const GET: APIRoute = async ({ url }) => {
@@ -18,6 +18,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       date: body.date, room: body.room, start: body.start, end: body.end,
       title: body.title, userId: user.id, userName: user.name
     });
+    return new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+};
+
+export const PUT: APIRoute = async ({ request, url, cookies }) => {
+  const user = getSession(cookies);
+  if (!user) return new Response('unauthorized', { status: 401 });
+  const id = url.searchParams.get('id');
+  if (!id) return new Response('missing id', { status: 400 });
+  const body = await request.json();
+  try {
+    const b = await updateBooking(id, user.id, body);
     return new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 400, headers: { 'Content-Type': 'application/json' } });

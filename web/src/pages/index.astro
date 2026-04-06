@@ -35,18 +35,26 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
     </div>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="attendance">出勤ログ</button>
+      <button class="tab active" data-tab="present">在席</button>
+      <button class="tab" data-tab="attendance">出勤ログ</button>
       <button class="tab" data-tab="rooms">会議室予約</button>
       <button class="tab" data-tab="visitors">来客</button>
     </nav>
 
-    <div class="datebar">
-      <button id="prevDay">◀</button>
-      <input type="date" id="dateInput">
-      <button id="nextDay">▶</button>
-    </div>
+    <section id="tab-present" class="panel active">
+      <div class="present-summary">
+        <span class="present-count" id="presentCount">0</span>
+        <span class="present-label">名 在席中</span>
+      </div>
+      <ul id="presentList"></ul>
+    </section>
 
-    <section id="tab-attendance" class="panel active">
+    <section id="tab-attendance" class="panel">
+      <div class="datebar">
+        <button id="prevDay">◀</button>
+        <input type="date" id="dateInput">
+        <button id="nextDay">▶</button>
+      </div>
       <table id="attendanceTable">
         <thead><tr><th>時刻</th><th>名前</th><th>区分</th></tr></thead>
         <tbody></tbody>
@@ -54,27 +62,37 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
     </section>
 
     <section id="tab-rooms" class="panel">
-      <div class="grid-wrap"><table id="roomGrid"></table></div>
-      <button id="newBookingBtn" class="fab">+ 予約</button>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--room-1)"></span>会議室</span>
+        <span><span class="swatch" style="background:var(--room-2)"></span>撮影部屋</span>
+        <span><span class="swatch" style="background:var(--room-3)"></span>洗面所</span>
+        <span style="margin-left:auto">✎ クリックで自分の予約を削除</span>
+      </div>
+      <div id="roomDays"></div>
+      <button id="newBookingBtn" class="fab">+ 予約を追加</button>
     </section>
 
     <section id="tab-visitors" class="panel">
-      <ul id="visitorList"></ul>
-      <button id="newVisitorBtn" class="fab">+ 来客</button>
+      <div id="visitorDays"></div>
+      <button id="newVisitorBtn" class="fab">+ 来客を登録</button>
     </section>
 
     <dialog id="bookingDialog">
       <form method="dialog">
-        <h3>会議室を予約</h3>
+        <h3 id="bookingTitle">会議室を予約</h3>
+        <label>日付 <select name="date" id="bookingDate"></select></label>
         <label>部屋
-          <select name="room">{ROOMS.map(r => <option>{r}</option>)}</select>
+          <select name="room" id="bookingRoom">{ROOMS.map(r => <option>{r}</option>)}</select>
         </label>
-        <label>開始 <input type="time" name="start" step="900" required></label>
-        <label>終了 <input type="time" name="end" step="900" required></label>
-        <label>用件 <input type="text" name="title" required></label>
+        <div style="display:flex;gap:8px">
+          <label style="flex:1">開始 <select name="start" id="bookingStart"></select></label>
+          <label style="flex:1">終了 <select name="end" id="bookingEnd"></select></label>
+        </div>
+        <label>用件 <input type="text" name="title" id="bookingTitleInput" required></label>
         <menu>
+          <button id="bookingDeleteBtn" type="button" class="primary danger" style="margin-right:auto;display:none">削除</button>
           <button value="cancel">キャンセル</button>
-          <button id="bookingSubmit" value="ok" class="primary">予約</button>
+          <button id="bookingSubmit" value="ok" class="primary">保存</button>
         </menu>
       </form>
     </dialog>
@@ -82,7 +100,11 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
     <dialog id="visitorDialog">
       <form method="dialog">
         <h3>来客を登録</h3>
-        <label>時刻 <input type="time" name="time" step="900" required></label>
+        <label>日付 <select name="date" id="visitorDate"></select></label>
+        <label>時刻 <input type="time" name="time" step="3600" min="09:00" max="20:00" required></label>
+        <label>場所
+          <select name="place" required>{ROOMS.map(r => <option>{r}</option>)}</select>
+        </label>
         <label>お名前 <input type="text" name="name" required></label>
         <label>会社名 <input type="text" name="company"></label>
         <label>用件 <input type="text" name="purpose"></label>
@@ -95,50 +117,107 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
 
     <script define:vars={{ ROOMS, USER: { id: user.id, name: user.name } }}>
       const TYPE_LABEL = { in: '出勤', out: '退勤' };
-      const SLOTS = (() => { const a = []; for (let h = 9; h < 21; h++) for (let m = 0; m < 60; m += 15) a.push(('0'+h).slice(-2)+':'+('0'+m).slice(-2)); return a; })();
+      const SLOTS = (() => { const a = []; for (let h = 8; h < 24; h++) a.push(('0'+h).slice(-2)+':00'); return a; })();
+      const END_SLOTS = (() => { const a = []; for (let h = 9; h <= 24; h++) a.push(('0'+h).slice(-2)+':00'); return a; })();
       const $ = s => document.querySelector(s);
-      const fmtDate = d => d.toISOString().slice(0,10);
-      let currentDate = new Date();
+      const fmtDate = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
+      const labelDate = ds => { const d = new Date(ds); return ds + ' (' + ['日','月','火','水','木','金','土'][d.getDay()] + ')'; };
+      const next5Days = () => { const out=[]; const d=new Date(); for(let i=0;i<5;i++){ const x=new Date(d); x.setDate(d.getDate()+i); out.push(fmtDate(x)); } return out; };
 
-      async function loadAll() {
-        const ds = fmtDate(currentDate);
-        const [att, bks, vis] = await Promise.all([
-          fetch('/api/attendance?date=' + ds).then(r => r.json()),
-          fetch('/api/bookings?date=' + ds).then(r => r.json()),
-          fetch('/api/visitors?date=' + ds).then(r => r.json())
-        ]);
-        renderAttendance(att); renderRooms(bks); renderVisitors(vis);
+      let attendanceDate = new Date();
+
+      async function loadAttendance() {
+        const ds = fmtDate(attendanceDate);
+        const att = await fetch('/api/attendance?date=' + ds).then(r => r.json());
+        renderAttendance(att);
       }
+      async function loadPresent() {
+        const today = fmtDate(new Date());
+        const att = await fetch('/api/attendance?date=' + today).then(r => r.json());
+        // userId ごとに最新を取り、最後が in の人を抽出
+        const byUser = {};
+        att.forEach(r => { if (!byUser[r.userId] || r.time > byUser[r.userId].time) byUser[r.userId] = r; });
+        const present = Object.values(byUser).filter(r => r.type === 'in').sort((a,b) => a.time.localeCompare(b.time));
+        $('#presentCount').textContent = present.length;
+        $('#presentList').innerHTML = present.length ? present.map(r =>
+          `<li><span class="avatar">${r.userName.charAt(0)}</span><div><b>${r.userName}</b><br><small>出勤 ${r.time}</small></div></li>`
+        ).join('') : '<li class="empty-card">在席者なし</li>';
+      }
+      async function loadRoomsAndVisitors() {
+        const days = next5Days();
+        const results = await Promise.all(days.flatMap(d => [
+          fetch('/api/bookings?date=' + d).then(r => r.json()),
+          fetch('/api/visitors?date=' + d).then(r => r.json())
+        ]));
+        const bookingsByDay = {}, visitorsByDay = {};
+        days.forEach((d, i) => {
+          bookingsByDay[d] = results[i*2];
+          visitorsByDay[d] = results[i*2+1];
+        });
+        renderRooms(days, bookingsByDay);
+        renderVisitors(days, visitorsByDay);
+      }
+      function loadAll() { loadPresent(); loadAttendance(); loadRoomsAndVisitors(); }
+
       function renderAttendance(rows) {
         $('#attendanceTable tbody').innerHTML = rows.map(r =>
           `<tr><td>${r.time}</td><td>${r.userName}</td><td><span class="badge ${r.type}">${TYPE_LABEL[r.type]}</span></td></tr>`
         ).join('') || '<tr><td colspan="3" style="text-align:center;color:#999">記録なし</td></tr>';
       }
-      function renderRooms(bookings) {
-        let html = '<thead><tr><th>時刻</th>' + ROOMS.map(r => `<th>${r}</th>`).join('') + '</tr></thead><tbody>';
-        SLOTS.forEach(s => {
-          html += `<tr><td>${s}</td>`;
-          ROOMS.forEach(room => {
-            const hit = bookings.find(b => b.room === room && s >= b.start && s < b.end);
-            if (hit) {
-              const cls = hit.userId === USER.id ? 'mine' : 'booked';
-              html += `<td class="${cls}" data-id="${hit.id}" title="${hit.title}/${hit.userName}">${hit.title}</td>`;
-            } else html += '<td></td>';
+      const todayStr = fmtDate(new Date());
+      function dayHeader(ds) {
+        const isToday = ds === todayStr;
+        return `<h3>${labelDate(ds)}${isToday ? '<span class="today-tag">TODAY</span>' : ''}</h3>`;
+      }
+
+      function renderRooms(days, byDay) {
+        $('#roomDays').innerHTML = days.map(ds => {
+          const bookings = byDay[ds];
+          // 各部屋ごとにスロットインデックスでスキップ管理
+          const skip = {}; ROOMS.forEach(r => skip[r] = new Set());
+          let rows = '';
+          SLOTS.forEach((s, i) => {
+            rows += `<tr><td>${s}</td>`;
+            ROOMS.forEach(room => {
+              if (skip[room].has(i)) return;
+              const hit = bookings.find(b => b.room === room && s >= b.start && s < b.end);
+              if (hit) {
+                const startIdx = SLOTS.indexOf(hit.start);
+                const endIdx = hit.end === '24:00' ? SLOTS.length : SLOTS.indexOf(hit.end);
+                const span = Math.max(1, endIdx - startIdx);
+                if (i === startIdx) {
+                  for (let k = 1; k < span; k++) skip[room].add(i + k);
+                  const cls = hit.userId === USER.id ? 'mine' : 'booked';
+                  rows += `<td class="${cls}" data-room="${room}" data-id="${hit.id}" rowspan="${span}" title="${hit.title} / ${hit.userName} (${hit.start}-${hit.end})">${hit.title}</td>`;
+                }
+              } else rows += `<td data-room="${room}"></td>`;
+            });
+            rows += '</tr>';
           });
-          html += '</tr>';
-        });
-        $('#roomGrid').innerHTML = html + '</tbody>';
-        $('#roomGrid').querySelectorAll('td.mine').forEach(td => td.onclick = async () => {
-          if (!confirm('予約を削除しますか？')) return;
-          const r = await fetch('/api/bookings?id=' + td.dataset.id, { method: 'DELETE' });
-          if (!r.ok) { alert((await r.json()).error); return; }
-          loadAll();
+          const isToday = ds === todayStr;
+          return `<div class="day-block ${isToday?'today':''}">${dayHeader(ds)}<table>
+            <thead><tr><th>時刻</th>${ROOMS.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
+            <tbody>${rows}</tbody></table></div>`;
+        }).join('');
+        $('#roomDays').querySelectorAll('td.mine').forEach(td => td.onclick = () => {
+          const dayDs = td.closest('.day-block').querySelector('h3').textContent.slice(0, 10);
+          const b = (byDay[dayDs] || []).find(x => x.id === td.dataset.id);
+          if (b) openBookingDialog(b);
         });
       }
-      function renderVisitors(vs) {
-        $('#visitorList').innerHTML = vs.map(v =>
-          `<li><b>${v.time}</b> ${v.name}${v.company ? ' (' + v.company + ')' : ''}<br><small>用件: ${v.purpose || '-'} / 担当: ${v.host}</small></li>`
-        ).join('') || '<li style="text-align:center;color:#999">来客予定なし</li>';
+      function renderVisitors(days, byDay) {
+        $('#visitorDays').innerHTML = days.map(ds => {
+          const vs = byDay[ds];
+          const items = vs.length ? vs.map(v =>
+            `<li><b>${v.time}</b> ${v.place ? `<span class="badge">${v.place}</span>` : ''} ${v.name}${v.company ? ' (' + v.company + ')' : ''}<br><small>用件: ${v.purpose || '-'} ・ 担当: ${v.host}</small></li>`
+          ).join('') : '<div class="empty">来客予定なし</div>';
+          const isToday = ds === todayStr;
+          return `<div class="day-block ${isToday?'today':''}">${dayHeader(ds)}<ul>${items}</ul></div>`;
+        }).join('');
+      }
+
+      function fillDateSelect(sel) {
+        sel.innerHTML = next5Days().map(d => `<option value="${d}">${labelDate(d)}</option>`).join('');
       }
 
       document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
@@ -146,38 +225,72 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
         t.classList.add('active'); $('#tab-' + t.dataset.tab).classList.add('active');
       });
-      $('#dateInput').value = fmtDate(currentDate);
-      $('#prevDay').onclick = () => { currentDate.setDate(currentDate.getDate()-1); $('#dateInput').value = fmtDate(currentDate); loadAll(); };
-      $('#nextDay').onclick = () => { currentDate.setDate(currentDate.getDate()+1); $('#dateInput').value = fmtDate(currentDate); loadAll(); };
-      $('#dateInput').onchange = e => { currentDate = new Date(e.target.value); loadAll(); };
+      $('#dateInput').value = fmtDate(attendanceDate);
+      $('#prevDay').onclick = () => { attendanceDate.setDate(attendanceDate.getDate()-1); $('#dateInput').value = fmtDate(attendanceDate); loadAttendance(); };
+      $('#nextDay').onclick = () => { attendanceDate.setDate(attendanceDate.getDate()+1); $('#dateInput').value = fmtDate(attendanceDate); loadAttendance(); };
+      $('#dateInput').onchange = e => { attendanceDate = new Date(e.target.value); loadAttendance(); };
 
       async function punch(type) {
         const r = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) });
         if (!r.ok) { alert('失敗'); return; }
-        loadAll();
+        loadAttendance(); loadPresent();
       }
       $('#punchIn').onclick = () => punch('in');
       $('#punchOut').onclick = () => punch('out');
 
-      $('#newBookingBtn').onclick = () => $('#bookingDialog').showModal();
+      function fillSlotSelect(sel, slots) { sel.innerHTML = slots.map(s => `<option value="${s}">${s}</option>`).join(''); }
+
+      let editingBookingId = null;
+      function openBookingDialog(b) {
+        fillDateSelect($('#bookingDate'));
+        fillSlotSelect($('#bookingStart'), SLOTS);
+        fillSlotSelect($('#bookingEnd'), END_SLOTS);
+        if (b) {
+          editingBookingId = b.id;
+          $('#bookingTitle').textContent = '予約を編集';
+          $('#bookingDate').value = b.date;
+          $('#bookingRoom').value = b.room;
+          $('#bookingStart').value = b.start;
+          $('#bookingEnd').value = b.end;
+          $('#bookingTitleInput').value = b.title;
+          $('#bookingDeleteBtn').style.display = 'inline-block';
+        } else {
+          editingBookingId = null;
+          $('#bookingTitle').textContent = '会議室を予約';
+          $('#bookingDeleteBtn').style.display = 'none';
+        }
+        $('#bookingDialog').showModal();
+      }
+
+      $('#newBookingBtn').onclick = () => openBookingDialog(null);
       $('#bookingSubmit').onclick = async e => {
         e.preventDefault();
         const f = $('#bookingDialog').querySelector('form');
         const fd = new FormData(f);
-        const r = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: fmtDate(currentDate), room: fd.get('room'), start: fd.get('start'), end: fd.get('end'), title: fd.get('title') }) });
+        const payload = { date: fd.get('date'), room: fd.get('room'), start: fd.get('start'), end: fd.get('end'), title: fd.get('title') };
+        if (payload.start >= payload.end) { alert('終了は開始より後を選んでください'); return; }
+        const url = editingBookingId ? '/api/bookings?id=' + editingBookingId : '/api/bookings';
+        const method = editingBookingId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!r.ok) { alert((await r.json()).error); return; }
-        $('#bookingDialog').close(); f.reset(); loadAll();
+        $('#bookingDialog').close(); f.reset(); loadRoomsAndVisitors();
       };
-      $('#newVisitorBtn').onclick = () => $('#visitorDialog').showModal();
+      $('#bookingDeleteBtn').onclick = async () => {
+        if (!editingBookingId) return;
+        if (!confirm('この予約を削除しますか？')) return;
+        const r = await fetch('/api/bookings?id=' + editingBookingId, { method: 'DELETE' });
+        if (!r.ok) { alert((await r.json()).error); return; }
+        $('#bookingDialog').close(); loadRoomsAndVisitors();
+      };
+      $('#newVisitorBtn').onclick = () => { fillDateSelect($('#visitorDate')); $('#visitorDialog').showModal(); };
       $('#visitorSubmit').onclick = async e => {
         e.preventDefault();
         const f = $('#visitorDialog').querySelector('form');
         const fd = new FormData(f);
         const r = await fetch('/api/visitors', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: fmtDate(currentDate), time: fd.get('time'), name: fd.get('name'), company: fd.get('company'), purpose: fd.get('purpose') }) });
+          body: JSON.stringify({ date: fd.get('date'), time: fd.get('time'), place: fd.get('place'), name: fd.get('name'), company: fd.get('company'), purpose: fd.get('purpose') }) });
         if (!r.ok) { alert('失敗'); return; }
-        $('#visitorDialog').close(); f.reset(); loadAll();
+        $('#visitorDialog').close(); f.reset(); loadRoomsAndVisitors();
       };
 
       loadAll();

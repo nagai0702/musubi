@@ -14,7 +14,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!user) return new Response('unauthorized', { status: 401 });
   const body = await request.json();
   const v = await addVisitor({
-    date: body.date, time: body.time, name: body.name,
+    date: body.date, time: body.time, place: body.place || '', name: body.name,
     company: body.company || '', purpose: body.purpose || '', host: user.name
   });
   return new Response(JSON.stringify(v), { headers: { 'Content-Type': 'application/json' } });

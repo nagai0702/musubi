@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { AstroCookies } from 'astro';
 
-const SECRET = process.env.SESSION_SECRET || 'dev-secret';
+const SECRET = import.meta.env.SESSION_SECRET || 'dev-secret';
 const COOKIE = 'yui_session';
 
 export type SessionUser = { id: string; name: string; email: string; };

@@ -1,16 +1,18 @@
 /** Slack OAuth (Sign in with Slack) + Bot polling */
 
-const CLIENT_ID = process.env.SLACK_CLIENT_ID!;
-const CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET!;
-const REDIRECT_URI = process.env.SLACK_REDIRECT_URI!;
-const TEAM_ID = process.env.SLACK_TEAM_ID || '';
+const CLIENT_ID = import.meta.env.SLACK_CLIENT_ID!;
+const CLIENT_SECRET = import.meta.env.SLACK_CLIENT_SECRET!;
+const REDIRECT_URI = import.meta.env.SLACK_REDIRECT_URI!;
+const TEAM_ID = import.meta.env.SLACK_TEAM_ID || '';
 
 export function getAuthUrl(state: string): string {
   const params = new URLSearchParams({
+    response_type: 'code',
     client_id: CLIENT_ID,
     scope: 'openid profile email',
     redirect_uri: REDIRECT_URI,
-    state
+    state,
+    nonce: crypto.randomUUID()
   });
   if (TEAM_ID) params.set('team', TEAM_ID);
   return 'https://slack.com/openid/connect/authorize?' + params.toString();
@@ -46,8 +48,8 @@ export async function exchangeCode(code: string) {
 const KEYWORDS: Record<string, 'in' | 'out'> = { '出勤': 'in', '退勤': 'out' };
 
 export async function pollAttendance(): Promise<Array<{ ts: number; userId: string; type: 'in' | 'out' }>> {
-  const token = process.env.SLACK_BOT_TOKEN!;
-  const channel = process.env.SLACK_ATTENDANCE_CHANNEL_ID!;
+  const token = import.meta.env.SLACK_BOT_TOKEN!;
+  const channel = import.meta.env.SLACK_ATTENDANCE_CHANNEL_ID!;
   const oldest = Math.floor(Date.now() / 1000) - 600; // 直近10分
   const url = `https://slack.com/api/conversations.history?channel=${channel}&oldest=${oldest}&limit=200`;
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });

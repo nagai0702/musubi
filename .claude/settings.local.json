@@ -4,7 +4,8 @@
       "Bash(curl:*)",
       "Bash(export PATH=\"$PATH:/c/Program Files/nodejs\")",
       "Bash(node -e \"const fs=require\\(''fs''\\); const d=JSON.parse\\(fs.readFileSync\\(''/c/Users/n0801/.claude/projects/C--Users-n0801-OneDrive--------claude/138296e7-d683-466e-a2c5-31439d60b559/tool-results/toolu_01DsHe1KXowuMmVkxvr3REF7.txt'',''utf8''\\)\\); console.log\\(d.paging && d.paging.next ? d.paging.next : ''NO_NEXT''\\);\")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }
