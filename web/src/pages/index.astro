@@ -162,8 +162,7 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
           // 経過時間（時）
           const start = new Date(`${r.date}T${r.time}:00+09:00`);
           const hours = (now - start) / 3600000;
-          // テスト: Nagai は強制的に炎
-          const isHot = hours >= 8 || /nagai/i.test(r.userName);
+          const isHot = hours >= 8;
           const fire = isHot ? '<span class="fire">🔥</span>' : '';
           const avatar = r.image
             ? `<div class="avatar-wrap"><img class="avatar" src="${r.image}" alt="">${fire}</div>`
