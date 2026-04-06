@@ -12,6 +12,17 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+<div id="inAppWarning" style="display:none;background:#fef3c7;color:#92400e;padding:12px 16px;font-size:13px;text-align:center;border-bottom:1px solid #fcd34d">
+  ⚠ アプリ内ブラウザではログインできません。<br>
+  右上のメニュー (••• や ↗) から <b>Safari / Chrome で開く</b> を選んでください。
+</div>
+<script is:inline>
+(function () {
+  var ua = navigator.userAgent || '';
+  var inApp = /Slack|Line|FBAN|FBAV|Instagram|Twitter|MicroMessenger/i.test(ua);
+  if (inApp) document.getElementById('inAppWarning').style.display = 'block';
+})();
+</script>
 {!user ? (
   <div class="login">
     <h1>結び 勤怠 & 会議室</h1>
