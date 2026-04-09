@@ -230,7 +230,9 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
           const skip = {}; ROOMS.forEach(r => skip[r] = new Set());
           let rows = '';
           SLOTS.forEach((s, i) => {
-            rows += `<tr><td>${s}</td>`;
+            const label = s.endsWith(':00') ? s : '';
+            const rowClass = s.endsWith(':30') ? ' class="half"' : '';
+            rows += `<tr${rowClass}><td class="time-label">${label}</td>`;
             ROOMS.forEach(room => {
               if (skip[room].has(i)) return;
               const hit = bookings.find(b => b.room === room && s >= b.start && s < b.end);
