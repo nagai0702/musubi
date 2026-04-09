@@ -73,6 +73,28 @@ export async function getSlackUser(userId: string): Promise<{ name: string; imag
   }
 }
 
+/** お知らせチャンネルの直近メッセージを取得 */
+export async function getNotices(limit = 10): Promise<Array<{ ts: string; text: string; userName: string; image: string }>> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const channel = import.meta.env.SLACK_NOTICE_CHANNEL_ID;
+  if (!token || !channel) return [];
+  try {
+    const res = await fetch(`https://slack.com/api/conversations.history?channel=${channel}&limit=${limit}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json() as any;
+    if (!data.ok) return [];
+    const messages = (data.messages || []).filter((m: any) => !m.subtype && m.text);
+    const result = await Promise.all(messages.map(async (m: any) => {
+      const u = m.user ? await getSlackUser(m.user) : { name: '', image: '' };
+      return { ts: m.ts, text: m.text, userName: u.name || 'unknown', image: u.image };
+    }));
+    return result;
+  } catch {
+    return [];
+  }
+}
+
 /** #attendance チャンネルにメッセージ投稿 */
 export async function postToAttendanceChannel(text: string): Promise<void> {
   const token = import.meta.env.SLACK_BOT_TOKEN;

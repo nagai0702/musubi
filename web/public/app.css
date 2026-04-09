@@ -219,6 +219,28 @@ dialog menu button.primary { border-color: var(--accent); }
 .badge.in { background: #dcfce7; color: #15803d; }
 .badge.out { background: #fee2e2; color: #b91c1c; }
 
+/* Notice board */
+.notice-board { background: var(--card); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.notice-board h3 { margin: 0 0 12px; font-size: 15px; color: var(--fg); }
+.notice-board ul { padding: 0; margin: 0; }
+.notice-item {
+  display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border);
+  background: none; border-radius: 0; margin: 0;
+}
+.notice-item:last-child { border-bottom: none; padding-bottom: 0; }
+.notice-item:first-child { padding-top: 0; }
+.notice-item .avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent-light); color: var(--accent-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; flex-shrink: 0; object-fit: cover;
+}
+.notice-item img.avatar { background: none; }
+.notice-body { flex: 1; min-width: 0; }
+.notice-body b { font-size: 13px; }
+.notice-body small { color: var(--muted); margin-left: 6px; font-size: 11px; }
+.notice-text { font-size: 14px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+
 /* Present tab */
 .present-summary {
   display: flex; align-items: baseline; gap: 8px;

@@ -57,6 +57,10 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         <span class="present-count" id="presentCount">0</span>
         <span class="present-label">名 在席中</span>
       </div>
+      <div class="notice-board">
+        <h3>📢 お知らせ</h3>
+        <ul id="noticeList"><li class="empty-card">読み込み中...</li></ul>
+      </div>
       <ul id="presentList"></ul>
     </section>
 
@@ -184,7 +188,29 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
         renderRooms(days, bookingsByDay);
         renderVisitors(days, visitorsByDay);
       }
-      function loadAll() { loadPresent(); loadAttendance(); loadRoomsAndVisitors(); }
+      function loadAll() { loadPresent(); loadNotices(); loadAttendance(); loadRoomsAndVisitors(); }
+
+      async function loadNotices() {
+        try {
+          const notices = await fetch('/api/notices').then(r => r.json());
+          if (!notices.length) {
+            $('#noticeList').innerHTML = '<li class="empty-card">お知らせなし</li>';
+            return;
+          }
+          $('#noticeList').innerHTML = notices.map(n => {
+            const d = new Date(parseFloat(n.ts) * 1000);
+            d.setHours(d.getHours() + 9);
+            const when = d.toISOString().slice(5, 16).replace('T', ' ');
+            const avatar = n.image
+              ? `<img class="avatar" src="${n.image}" alt="">`
+              : `<span class="avatar">${(n.userName || '?').charAt(0)}</span>`;
+            const text = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            return `<li class="notice-item">${avatar}<div class="notice-body"><b>${n.userName}</b> <small>${when}</small><div class="notice-text">${text}</div></div></li>`;
+          }).join('');
+        } catch (e) {
+          $('#noticeList').innerHTML = '<li class="empty-card">取得エラー</li>';
+        }
+      }
 
       function renderAttendance(rows) {
         $('#attendanceTable tbody').innerHTML = rows.map(r =>
