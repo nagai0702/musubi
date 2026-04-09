@@ -81,6 +81,15 @@ export const POST: APIRoute = async ({ request }) => {
         return reply(`✅ 来客登録: ${date} ${time} ${place} ${name} ${company} (担当: ${userName})`, false);
       }
 
+      case '/お知らせ': {
+        if (!text) return reply('使い方: `/お知らせ 明日は休みです`');
+        // in_channel でチャンネルに投稿 → notices フィルタが /お知らせ プレフィックスで拾う
+        return new Response(JSON.stringify({
+          response_type: 'in_channel',
+          text: `/お知らせ ${userName}: ${text}`
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
       case '/一覧': {
         const { date } = parseDatePrefix(text);
         const list = await getBookings(date);
