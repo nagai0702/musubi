@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
-import { addAttendance, createBooking, addVisitor, getBookings } from '@/lib/sheets';
-import { postToAttendanceChannel } from '@/lib/slack';
+import { addAttendance, createBooking, addVisitor, getBookings, popLatestReminderId } from '@/lib/sheets';
+import { postToAttendanceChannel, schedulePunchOutReminder, cancelScheduledMessage } from '@/lib/slack';
 
 const SIGNING_SECRET = import.meta.env.SLACK_SIGNING_SECRET || '';
 
@@ -52,13 +52,18 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     switch (command) {
-      case '/出勤':
-        await addAttendance(userId, userName, 'in', 'slack');
+      case '/出勤': {
+        const reminderId = await schedulePunchOutReminder(userId, 10);
+        await addAttendance(userId, userName, 'in', 'slack', reminderId);
         return reply(`✅ ${userName} さん 出勤を記録しました`, false);
+      }
 
-      case '/退勤':
+      case '/退勤': {
+        const prevId = await popLatestReminderId(userId);
+        if (prevId) cancelScheduledMessage(prevId).catch(() => {});
         await addAttendance(userId, userName, 'out', 'slack');
         return reply(`✅ ${userName} さん 退勤を記録しました`, false);
+      }
 
       case '/予約': {
         // 例: [今日|明日|YYYY-MM-DD] 会議室 14:00-15:00 採用面接
