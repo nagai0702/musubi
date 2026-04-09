@@ -138,8 +138,8 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
 
     <script define:vars={{ ROOMS, USER: { id: user.id, name: user.name } }}>
       const TYPE_LABEL = { in: '出勤', out: '退勤' };
-      const SLOTS = (() => { const a = []; for (let h = 8; h < 24; h++) a.push(('0'+h).slice(-2)+':00'); return a; })();
-      const END_SLOTS = (() => { const a = []; for (let h = 9; h <= 24; h++) a.push(('0'+h).slice(-2)+':00'); return a; })();
+      const SLOTS = (() => { const a = []; for (let h = 8; h < 24; h++) { a.push(('0'+h).slice(-2)+':00'); a.push(('0'+h).slice(-2)+':30'); } return a; })();
+      const END_SLOTS = (() => { const a = []; for (let h = 8; h < 24; h++) { a.push(('0'+h).slice(-2)+':30'); a.push(('0'+(h+1)).slice(-2)+':00'); } return a; })();
       const $ = s => document.querySelector(s);
       const fmtDate = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
       const labelDate = ds => { const d = new Date(ds); return ds + ' (' + ['日','月','火','水','木','金','土'][d.getDay()] + ')'; };
