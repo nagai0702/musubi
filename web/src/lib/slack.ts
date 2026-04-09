@@ -122,9 +122,11 @@ export async function getNotices(limit = 10): Promise<Array<{ ts: string; text: 
     const data = await res.json() as any;
     if (!data.ok) return [];
     const PREFIX = /^\/?お知らせ[\s　]+/;
+    // 投稿者接頭 "xxx: " を除去
+    const AUTHOR_PREFIX = /^[^:：]+[:：]\s*/;
     const messages = (data.messages || [])
       .filter((m: any) => !m.subtype && m.text && PREFIX.test(m.text))
-      .map((m: any) => ({ ...m, text: m.text.replace(PREFIX, '').trim() }))
+      .map((m: any) => ({ ...m, text: m.text.replace(PREFIX, '').replace(AUTHOR_PREFIX, '').trim() }))
       .filter((m: any) => m.text);
     const result = await Promise.all(messages.map(async (m: any) => {
       const u = m.user ? await getSlackUser(m.user) : { name: '', image: '' };

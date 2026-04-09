@@ -241,7 +241,7 @@ dialog menu button.primary { border-color: var(--accent); }
 .notice-body { flex: 1; min-width: 0; }
 .notice-body b { font-size: 13px; }
 .notice-body small { color: var(--muted); margin-left: 6px; font-size: 11px; }
-.notice-text { font-size: 14px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+.notice-text { font-size: 16px; font-weight: 700; margin-top: 4px; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
 
 /* Present tab */
 .present-summary {

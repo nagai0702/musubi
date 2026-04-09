@@ -201,11 +201,8 @@ const ROOMS = ['会議室', '撮影部屋', '洗面所'];
             const d = new Date(parseFloat(n.ts) * 1000);
             d.setHours(d.getHours() + 9);
             const when = d.toISOString().slice(5, 16).replace('T', ' ');
-            const avatar = n.image
-              ? `<img class="avatar" src="${n.image}" alt="">`
-              : `<span class="avatar">${(n.userName || '?').charAt(0)}</span>`;
             const text = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-            return `<li class="notice-item">${avatar}<div class="notice-body"><b>${n.userName}</b> <small>${when}</small><div class="notice-text">${text}</div></div></li>`;
+            return `<li class="notice-item"><div class="notice-body"><b>今日のお知らせ</b> <small>${when}</small><div class="notice-text">${text}</div></div></li>`;
           }).join('');
         } catch (e) {
           $('#noticeList').innerHTML = '<li class="empty-card">取得エラー</li>';
