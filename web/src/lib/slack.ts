@@ -73,6 +73,43 @@ export async function getSlackUser(userId: string): Promise<{ name: string; imag
   }
 }
 
+/** 10時間後の退勤リマインダーを予約し scheduled_message_id を返す */
+export async function schedulePunchOutReminder(slackUserId: string, hoursAhead = 10): Promise<string> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const channel = import.meta.env.SLACK_ATTENDANCE_CHANNEL_ID;
+  if (!token || !channel || !slackUserId) return '';
+  const postAt = Math.floor(Date.now() / 1000) + hoursAhead * 3600;
+  try {
+    const res = await fetch('https://slack.com/api/chat.scheduleMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        channel,
+        post_at: postAt,
+        text: `<@${slackUserId}> 退勤を忘れていませんか？🕙 (出勤から${hoursAhead}時間経過)`
+      })
+    });
+    const data = await res.json() as any;
+    return data.ok ? data.scheduled_message_id : '';
+  } catch {
+    return '';
+  }
+}
+
+/** 予約済みメッセージをキャンセル */
+export async function cancelScheduledMessage(scheduledMessageId: string): Promise<void> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const channel = import.meta.env.SLACK_ATTENDANCE_CHANNEL_ID;
+  if (!token || !channel || !scheduledMessageId) return;
+  try {
+    await fetch('https://slack.com/api/chat.deleteScheduledMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ channel, scheduled_message_id: scheduledMessageId })
+    });
+  } catch {}
+}
+
 /** お知らせチャンネルの直近メッセージを取得 */
 export async function getNotices(limit = 10): Promise<Array<{ ts: string; text: string; userName: string; image: string }>> {
   const token = import.meta.env.SLACK_BOT_TOKEN;

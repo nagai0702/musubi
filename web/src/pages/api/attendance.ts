@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { getAttendance, addAttendance, getLatestPerUser } from '@/lib/sheets';
+import { getAttendance, addAttendance, getLatestPerUser, popLatestReminderId } from '@/lib/sheets';
 import { getSession } from '@/lib/session';
-import { postToAttendanceChannel } from '@/lib/slack';
+import { postToAttendanceChannel, schedulePunchOutReminder, cancelScheduledMessage } from '@/lib/slack';
 
 function todayJST(): string {
   const jst = new Date(Date.now() + 9 * 3600 * 1000);
@@ -33,7 +33,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return new Response(JSON.stringify({ error: msg }), { status: 409, headers: { 'Content-Type': 'application/json' } });
   }
 
-  await addAttendance(user.id, user.name, type, 'web');
+  let reminderId = '';
+  if (type === 'in') {
+    // 出勤: 10時間後の退勤リマインダーを予約
+    reminderId = await schedulePunchOutReminder(user.id, 10);
+  } else {
+    // 退勤: 直近の出勤に紐づくリマインダーをキャンセル
+    const prevId = await popLatestReminderId(user.id);
+    if (prevId) cancelScheduledMessage(prevId).catch(() => {});
+  }
+
+  await addAttendance(user.id, user.name, type, 'web', reminderId);
 
   // Slack通知
   const label = type === 'in' ? '🟢 出勤' : '🔴 退勤';

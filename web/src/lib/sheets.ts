@@ -91,8 +91,25 @@ export async function getAttendance(date: string): Promise<AttendanceRow[]> {
     .sort((a, b) => a.time.localeCompare(b.time));
 }
 
-export async function addAttendance(userId: string, userName: string, type: 'in' | 'out', source = 'web') {
-  await append('Attendance!A:E', [nowJSTString(), userId, userName, type, source]);
+export async function addAttendance(userId: string, userName: string, type: 'in' | 'out', source = 'web', reminderId = '') {
+  await append('Attendance!A:F', [nowJSTString(), userId, userName, type, source, reminderId]);
+}
+
+/** 指定ユーザーの最新 'in' 行の reminder_id (F列) を取得してクリア */
+export async function popLatestReminderId(userId: string): Promise<string> {
+  const rows = await read('Attendance!A2:F');
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    if (r[1] === userId && r[3] === 'in') {
+      const id = r[5] || '';
+      if (id) {
+        // F列をクリア
+        await updateRow(`Attendance!F${i + 2}:F${i + 2}`, ['']);
+      }
+      return id;
+    }
+  }
+  return '';
 }
 
 /** 全打刻履歴を時系列で取得（在席判定・最新打刻判定用） */
