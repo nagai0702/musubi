@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { addAttendance, createBooking, addVisitor, getBookings } from '@/lib/sheets';
+import { postToAttendanceChannel } from '@/lib/slack';
 
 const SIGNING_SECRET = import.meta.env.SLACK_SIGNING_SECRET || '';
 
@@ -83,11 +84,9 @@ export const POST: APIRoute = async ({ request }) => {
 
       case '/お知らせ': {
         if (!text) return reply('使い方: `/お知らせ 明日は休みです`');
-        // in_channel でチャンネルに投稿 → notices フィルタが /お知らせ プレフィックスで拾う
-        return new Response(JSON.stringify({
-          response_type: 'in_channel',
-          text: `/お知らせ ${userName}: ${text}`
-        }), { headers: { 'Content-Type': 'application/json' } });
+        // #attendance チャンネルに強制投稿（どのチャンネルで叩かれても）
+        await postToAttendanceChannel(`/お知らせ ${userName}: ${text}`);
+        return reply(`📢 お知らせを投稿しました`, true);
       }
 
       case '/一覧': {
