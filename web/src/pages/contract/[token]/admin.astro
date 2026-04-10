@@ -1,0 +1,332 @@
+---
+import { getSession } from '@/lib/session';
+import { getByToken } from '@/lib/contracts';
+const user = getSession(Astro.cookies);
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>契約管理 - 結び</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
+    .header { background: #fff; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .user { font-size: 14px; color: #666; }
+    .container { max-width: 540px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f9fafb; font-size: 14px; }
+    .info-row .label { color: #666; }
+    .info-row .value { font-weight: 500; text-align: right; max-width: 60%; word-break: break-all; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
+    .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; }
+    .field input:focus, .field select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .no-auth { text-align: center; padding: 60px 20px; }
+    .no-auth a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .error { display: none; padding: 12px; background: #fef2f2; color: #b91c1c; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    .url-box { padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 13px; margin-bottom: 16px; word-break: break-all; }
+    .url-box a { color: #2563eb; }
+    .copy-btn { display: inline-block; margin-top: 8px; padding: 6px 16px; background: #10b981; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .copy-btn:hover { background: #059669; }
+
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+    .status-draft { background: #fef3c7; color: #92400e; }
+    .status-customer_filled { background: #dbeafe; color: #1e40af; }
+    .status-priced { background: #ede9fe; color: #5b21b6; }
+    .status-signed { background: #d1fae5; color: #065f46; }
+    .status-payment_done { background: #f0fdf4; color: #166534; }
+
+    .waiting { text-align: center; padding: 32px 16px; }
+    .waiting .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .waiting p { font-size: 14px; color: #666; }
+
+    /* phase sections */
+    .phase { display: none; }
+    .phase.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>契約管理</h1>
+    <span class="user">{user?.name || ''}</span>
+  </div>
+
+  {!user ? (
+    <div class="no-auth">
+      <p style="margin-bottom: 16px;">営業担当者のみアクセスできます</p>
+      <a href="/api/auth/slack/login">Slackでログイン</a>
+    </div>
+  ) : !contract ? (
+    <div class="no-auth"><p>契約が見つかりません</p></div>
+  ) : (
+    <div class="container">
+      <div class="error" id="errorMsg"></div>
+
+      <!-- ステータス表示 -->
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:16px 24px;">
+        <span style="font-size:14px; color:#666;">ステータス</span>
+        <span class={`status-badge status-${contract.status}`} id="statusBadge">
+          {contract.status === 'draft' ? '顧客入力待ち' :
+           contract.status === 'customer_filled' ? '単価設定待ち' :
+           contract.status === 'priced' ? '署名待ち' :
+           contract.status === 'signed' ? '決済待ち' : '完了'}
+        </span>
+      </div>
+
+      <!-- Phase 1: 顧客入力待ち -->
+      <div class={`phase ${contract.status === 'draft' ? 'active' : ''}`} id="phase-draft">
+        <div class="card">
+          <h2>顧客用URL</h2>
+          <p style="font-size: 13px; color: #666; margin-bottom: 12px;">このURLをオンライン会議で共有してください</p>
+          <div class="url-box">
+            <span id="customerUrl"></span>
+            <br><button class="copy-btn" id="copyUrlBtn">URLをコピー</button>
+          </div>
+          <div class="waiting">
+            <div class="spinner"></div>
+            <p>顧客の入力を待っています...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2: 顧客情報表示 + 単価入力 -->
+      <div class={`phase ${contract.status === 'customer_filled' ? 'active' : ''}`} id="phase-customer_filled">
+        <div class="card" id="customerInfoCard">
+          <h2>顧客情報</h2>
+          <div class="info-row"><span class="label">お名前</span><span class="value" id="c-name">{contract.name}</span></div>
+          <div class="info-row"><span class="label">フリガナ</span><span class="value" id="c-nameKana">{contract.nameKana}</span></div>
+          <div class="info-row"><span class="label">メール</span><span class="value" id="c-email">{contract.email}</span></div>
+          <div class="info-row"><span class="label">電話番号</span><span class="value" id="c-phone">{contract.phone}</span></div>
+          <div class="info-row"><span class="label">生年月日</span><span class="value" id="c-birthday">{contract.birthday}</span></div>
+          <div class="info-row"><span class="label">住所</span><span class="value" id="c-address">{contract.postalCode} {contract.address}</span></div>
+          <div class="info-row"><span class="label">顧客ID</span><span class="value" id="c-customerId">{contract.customerId}</span></div>
+        </div>
+        <div class="card">
+          <h2>契約条件を入力</h2>
+          <form id="pricingForm">
+            <div class="field">
+              <label>プラン</label>
+              <select name="plan" required>
+                <option value="">選択してください</option>
+                <option value="スタンダード">スタンダード</option>
+                <option value="ゴールド">ゴールド</option>
+                <option value="プラチナ">プラチナ</option>
+              </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="field">
+                <label>契約開始日</label>
+                <input type="date" name="contractStartDate" required>
+              </div>
+              <div class="field">
+                <label>活動開始日</label>
+                <input type="date" name="activityStartDate" required>
+              </div>
+            </div>
+            <div class="field">
+              <label>【初期費用】支払い方法</label>
+              <select name="initialPaymentMethod" required>
+                <option value="クレジットカード">クレジットカード</option>
+                <option value="振込">振込</option>
+              </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="field">
+                <label>【初期費用】前金</label>
+                <input type="text" name="upfrontPayment" value="¥0" placeholder="¥0">
+              </div>
+              <div class="field">
+                <label>【初期費用】支払い回数</label>
+                <input type="text" name="paymentInstallments" placeholder="例: 一括">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="field">
+                <label>【月額費用】支払い方法</label>
+                <select name="monthlyPaymentMethod">
+                  <option value="クレジットカード">クレジットカード</option>
+                  <option value="口座振替">口座振替</option>
+                  <option value="振込">振込</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>【月額費用】縛り期間</label>
+                <select name="contractPeriod">
+                  <option value="12か月">12か月</option>
+                  <option value="3ヶ月">3ヶ月</option>
+                </select>
+              </div>
+            </div>
+            <hr style="border:none; border-top:1px solid #e5e7eb; margin:16px 0;">
+            <div class="field">
+              <label>決済方法（署名後の遷移先）</label>
+              <select name="paymentMethod" required>
+                <option value="">選択してください</option>
+                <option value="transfer">振込</option>
+                <option value="credit">クレジットカード（テレコムクレジット）</option>
+                <option value="lifti">ライフティ（日程調整）</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" id="pricingBtn">確定 → 契約書を生成して顧客に表示</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Phase 3: 署名待ち -->
+      <div class={`phase ${contract.status === 'priced' ? 'active' : ''}`} id="phase-priced">
+        <div class="card">
+          <div class="waiting">
+            <div class="spinner"></div>
+            <p>顧客が契約書を確認・署名中です...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4: 決済待ち -->
+      <div class={`phase ${contract.status === 'signed' ? 'active' : ''}`} id="phase-signed">
+        <div class="card">
+          <div class="waiting">
+            <div class="spinner"></div>
+            <p>顧客が決済手続き中です...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 5: 完了 -->
+      <div class={`phase ${contract.status === 'payment_done' ? 'active' : ''}`} id="phase-payment_done">
+        <div class="card" style="text-align:center; padding: 32px;">
+          <div style="font-size:48px; margin-bottom:12px;">✅</div>
+          <h2 style="border:none; padding:0; color:#059669;">契約完了</h2>
+          <p style="font-size:14px; color:#666; margin-top:8px;">すべての手続きが完了しました</p>
+        </div>
+      </div>
+    </div>
+  )}
+
+<script is:inline define:vars={{ token }}>
+(function() {
+  if (!token) return;
+  const phases = ['draft', 'customer_filled', 'priced', 'signed', 'payment_done'];
+  const statusLabels = {
+    draft: '顧客入力待ち',
+    customer_filled: '単価設定待ち',
+    priced: '署名待ち',
+    signed: '決済待ち',
+    payment_done: '完了',
+  };
+  let currentStatus = document.querySelector('.phase.active')?.id.replace('phase-', '') || 'draft';
+
+  // 顧客用URL表示
+  const urlEl = document.getElementById('customerUrl');
+  if (urlEl) {
+    const url = location.origin + '/contract/' + token + '/form';
+    urlEl.textContent = url;
+    document.getElementById('copyUrlBtn')?.addEventListener('click', function() {
+      navigator.clipboard.writeText(url);
+      this.textContent = 'コピーしました!';
+      setTimeout(() => { this.textContent = 'URLをコピー'; }, 2000);
+    });
+  }
+
+  // ステータスポーリング（3秒間隔）
+  function switchPhase(newStatus, data) {
+    if (newStatus === currentStatus) return;
+    document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+    const next = document.getElementById('phase-' + newStatus);
+    if (next) next.classList.add('active');
+
+    const badge = document.getElementById('statusBadge');
+    if (badge) {
+      badge.className = 'status-badge status-' + newStatus;
+      badge.textContent = statusLabels[newStatus] || newStatus;
+    }
+
+    // 顧客情報が来たら表示を更新
+    if (newStatus === 'customer_filled' && data) {
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || ''; };
+      set('c-name', data.name);
+      set('c-email', data.email);
+      set('c-customerId', data.customerId);
+    }
+
+    currentStatus = newStatus;
+  }
+
+  let pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/contract/status?token=' + token);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.status !== currentStatus) {
+        if (data.status === 'customer_filled') {
+          // ページリロードで最新の顧客情報を反映
+          location.reload();
+        } else {
+          switchPhase(data.status, data);
+        }
+      }
+      if (data.status === 'payment_done') clearInterval(pollTimer);
+    } catch {}
+  }, 3000);
+
+  // 単価設定フォーム
+  document.getElementById('pricingForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+    const btn = document.getElementById('pricingBtn');
+    btn.disabled = true;
+    btn.textContent = '処理中...';
+
+    const fd = new FormData(this);
+    // 日付をYYYY/MM/DD形式に変換
+    const fmtDate = (v) => v ? v.replace(/-/g, '/') : '';
+    try {
+      const res = await fetch('/api/contract/set-pricing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: token,
+          plan: fd.get('plan'),
+          contractStartDate: fmtDate(fd.get('contractStartDate')),
+          activityStartDate: fmtDate(fd.get('activityStartDate')),
+          initialPaymentMethod: fd.get('initialPaymentMethod'),
+          upfrontPayment: fd.get('upfrontPayment'),
+          paymentInstallments: fd.get('paymentInstallments'),
+          monthlyPaymentMethod: fd.get('monthlyPaymentMethod'),
+          contractPeriod: fd.get('contractPeriod'),
+          paymentMethod: fd.get('paymentMethod'),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        switchPhase('priced', data);
+      } else {
+        errEl.textContent = data.error || '処理に失敗しました';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '確定 → 契約書を生成して顧客に表示';
+      }
+    } catch (err) {
+      errEl.textContent = '通信エラーが発生しました';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '確定 → 契約書を生成して顧客に表示';
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+---
+import { getByToken } from '@/lib/contracts';
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+const canSign = contract?.status === 'priced';
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>契約書確認・押印 - 結び</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Header */
+    .header { background: #1a1a2e; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header .step { font-size: 13px; color: #94a3b8; }
+
+    /* Tabs */
+    .tabs { display: flex; background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 16px; overflow-x: auto; }
+    .tab { padding: 12px 16px; font-size: 13px; font-weight: 500; color: #666; border: none; background: none; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
+    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .tab:hover { color: #333; }
+
+    /* PDF Viewer */
+    .viewer { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .pdf-container { flex: 1; overflow: auto; background: #e5e7eb; display: flex; justify-content: center; padding: 16px; }
+    .pdf-container iframe { background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.15); border: none; width: 100%; max-width: 800px; height: 100%; min-height: 600px; }
+
+    /* Zoom controls */
+    .zoom-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; background: #fff; border-top: 1px solid #e5e7eb; }
+    .zoom-bar button { width: 32px; height: 32px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .zoom-bar button:hover { background: #f1f5f9; }
+    .zoom-bar span { font-size: 13px; color: #666; min-width: 48px; text-align: center; }
+
+    /* Bottom action */
+    .bottom-bar { background: #fff; border-top: 1px solid #e5e7eb; padding: 16px; }
+    .bottom-inner { max-width: 800px; margin: 0 auto; }
+
+    /* Stamp UI */
+    .stamp-section { display: none; }
+    .stamp-section.active { display: block; }
+    .stamp-preview-area { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .stamp-input { flex: 1; }
+    .stamp-input label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+    .stamp-input input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; }
+    .stamp-input input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .stamp-preview { width: 72px; height: 72px; border: 2px solid #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stamp-preview .stamp-text { color: #dc2626; font-weight: 700; font-size: 14px; text-align: center; line-height: 1.2; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; }
+    .stamp-preview.empty { border-color: #d1d5db; }
+    .stamp-preview.empty .stamp-text { color: #ccc; }
+
+    .confirm-checks { margin-bottom: 16px; }
+    .confirm-check { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; }
+    .confirm-check input { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
+    .confirm-check span { font-size: 13px; line-height: 1.5; }
+
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .btn-outline { background: #fff; color: #2563eb; border: 2px solid #2563eb; margin-bottom: 8px; }
+
+    .error { display: none; padding: 12px; background: #fef2f2; color: #b91c1c; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+    .msg { text-align: center; padding: 80px 20px; }
+    .msg h2 { font-size: 20px; margin-bottom: 12px; }
+
+    @media (max-width: 640px) {
+      .pdf-container iframe { min-height: 400px; }
+      .stamp-preview-area { flex-direction: column; align-items: stretch; }
+      .stamp-preview { align-self: center; }
+    }
+  </style>
+</head>
+<body>
+  {!contract ? (
+    <div class="msg"><h2>無効なリンク</h2><p>このURLは無効です。</p></div>
+  ) : !canSign ? (
+    <div class="msg">
+      <h2>{contract.status === 'signed' ? '押印済み' : '押印できません'}</h2>
+      <p>{contract.status === 'signed' ? 'すでに押印が完了しています。' : '現在この契約は押印可能な状態ではありません。'}</p>
+    </div>
+  ) : (
+    <>
+      <div class="header">
+        <h1>契約書確認・押印</h1>
+        <span class="step">STEP 1: 書類確認 → STEP 2: 押印</span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-sheet="0">利用申込契約書</button>
+        <button class="tab" data-sheet="1">サービス概要書面</button>
+        <button class="tab" data-sheet="2">サービス利用料金</button>
+      </div>
+
+      <div class="viewer">
+        <div class="pdf-container">
+          <iframe id="pdfFrame" src={`/api/contract/pdf?token=${token}&sheet=0`}></iframe>
+        </div>
+        <div class="zoom-bar">
+          <button id="zoomOut">−</button>
+          <span id="zoomLevel">100%</span>
+          <button id="zoomIn">+</button>
+          <button id="zoomFit" style="width:auto; padding:0 12px; font-size:12px;">フィット</button>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="bottom-inner">
+          <div class="error" id="errorMsg"></div>
+
+          <!-- 書類確認フェーズ -->
+          <div class="stamp-section active" id="phase-review">
+            <p style="font-size:13px; color:#666; margin-bottom:12px; text-align:center;">3つの書類をすべてご確認ください</p>
+            <button class="btn btn-primary" id="toStampBtn" disabled>すべて確認しました → 押印へ進む</button>
+          </div>
+
+          <!-- 押印フェーズ -->
+          <div class="stamp-section" id="phase-stamp">
+            <div class="stamp-preview-area">
+              <div class="stamp-input">
+                <label>押印するお名前（姓）</label>
+                <input type="text" id="stampName" placeholder="例: 山田" maxlength="4">
+              </div>
+              <div class="stamp-preview empty" id="stampPreview">
+                <span class="stamp-text" id="stampText">印</span>
+              </div>
+            </div>
+
+            <div class="confirm-checks">
+              <div class="confirm-check">
+                <input type="checkbox" id="chk1">
+                <span>上記契約書の内容を確認し、同意の上で押印します。</span>
+              </div>
+              <div class="confirm-check">
+                <input type="checkbox" id="chk2">
+                <span>クーリングオフの内容を理解しています。</span>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="submitBtn" disabled>押印して契約を確定する</button>
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+
+<script is:inline>
+(function() {
+  const pdfFrame = document.getElementById('pdfFrame');
+  if (!pdfFrame) return;
+  const token = new URL(location.href).pathname.split('/')[2];
+
+  // --- Tab switching ---
+  const tabs = document.querySelectorAll('.tab');
+  const viewedSheets = new Set();
+  viewedSheets.add('0');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      tabs.forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      const sheet = this.dataset.sheet;
+      pdfFrame.src = '/api/contract/pdf?token=' + token + '&sheet=' + sheet;
+      viewedSheets.add(sheet);
+      updateReviewBtn();
+    });
+  });
+
+  function updateReviewBtn() {
+    const btn = document.getElementById('toStampBtn');
+    if (viewedSheets.size >= 3) {
+      btn.disabled = false;
+      btn.textContent = 'すべて確認しました → 押印へ進む';
+    } else {
+      btn.disabled = true;
+      btn.textContent = '残り' + (3 - viewedSheets.size) + '件の書類を確認してください';
+    }
+  }
+  updateReviewBtn();
+
+  // --- Zoom ---
+  let zoom = 100;
+  document.getElementById('zoomIn').addEventListener('click', () => {
+    zoom = Math.min(200, zoom + 25);
+    pdfFrame.style.transform = 'scale(' + (zoom / 100) + ')';
+    pdfFrame.style.transformOrigin = 'top center';
+    document.getElementById('zoomLevel').textContent = zoom + '%';
+  });
+  document.getElementById('zoomOut').addEventListener('click', () => {
+    zoom = Math.max(50, zoom - 25);
+    pdfFrame.style.transform = 'scale(' + (zoom / 100) + ')';
+    pdfFrame.style.transformOrigin = 'top center';
+    document.getElementById('zoomLevel').textContent = zoom + '%';
+  });
+  document.getElementById('zoomFit').addEventListener('click', () => {
+    zoom = 100;
+    pdfFrame.style.transform = 'none';
+    document.getElementById('zoomLevel').textContent = '100%';
+  });
+
+  // --- Phase transition ---
+  document.getElementById('toStampBtn').addEventListener('click', () => {
+    document.getElementById('phase-review').classList.remove('active');
+    document.getElementById('phase-stamp').classList.add('active');
+  });
+
+  // --- Stamp preview ---
+  const stampInput = document.getElementById('stampName');
+  const stampPreview = document.getElementById('stampPreview');
+  const stampText = document.getElementById('stampText');
+
+  stampInput.addEventListener('input', () => {
+    const name = stampInput.value.trim();
+    if (name) {
+      stampPreview.classList.remove('empty');
+      // 2文字以上は縦書き風に改行
+      stampText.textContent = name.length > 2 ? name.slice(0, 2) + '\n' + name.slice(2) : name;
+      stampText.style.whiteSpace = 'pre-line';
+    } else {
+      stampPreview.classList.add('empty');
+      stampText.textContent = '印';
+    }
+    updateSubmitBtn();
+  });
+
+  // --- Submit validation ---
+  const chk1 = document.getElementById('chk1');
+  const chk2 = document.getElementById('chk2');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function updateSubmitBtn() {
+    submitBtn.disabled = !(stampInput.value.trim() && chk1.checked && chk2.checked);
+  }
+  chk1.addEventListener('change', updateSubmitBtn);
+  chk2.addEventListener('change', updateSubmitBtn);
+
+  // --- Submit ---
+  submitBtn.addEventListener('click', async () => {
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = '処理中...';
+
+    // Canvas で印鑑画像を生成
+    const stampCanvas = document.createElement('canvas');
+    stampCanvas.width = 200;
+    stampCanvas.height = 200;
+    const ctx = stampCanvas.getContext('2d');
+    // 背景透過
+    ctx.clearRect(0, 0, 200, 200);
+    // 外枠（赤い円）
+    ctx.beginPath();
+    ctx.arc(100, 100, 90, 0, Math.PI * 2);
+    ctx.strokeStyle = '#cc0000';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    // 文字
+    const name = stampInput.value.trim();
+    ctx.fillStyle = '#cc0000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (name.length <= 2) {
+      ctx.font = 'bold 60px "Yu Mincho", "Hiragino Mincho ProN", serif';
+      ctx.fillText(name, 100, 105);
+    } else if (name.length <= 3) {
+      ctx.font = 'bold 44px "Yu Mincho", "Hiragino Mincho ProN", serif';
+      ctx.fillText(name, 100, 105);
+    } else {
+      ctx.font = 'bold 38px "Yu Mincho", "Hiragino Mincho ProN", serif';
+      const top = name.slice(0, 2);
+      const bot = name.slice(2, 4);
+      ctx.fillText(top, 100, 80);
+      ctx.fillText(bot, 100, 125);
+    }
+
+    const signatureData = stampCanvas.toDataURL('image/png');
+
+    try {
+      const res = await fetch('/api/contract/submit-signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, signatureData }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        location.href = '/contract/' + token + '/payment';
+      } else {
+        errEl.textContent = data.error || '送信に失敗しました';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = '押印して契約を確定する';
+      }
+    } catch (err) {
+      errEl.textContent = '通信エラーが発生しました';
+      errEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = '押印して契約を確定する';
+    }
+  });
+})();
+</script>
+</body>
+</html>

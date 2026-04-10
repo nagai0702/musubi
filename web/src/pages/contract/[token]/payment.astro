@@ -1,0 +1,106 @@
+---
+import { getByToken } from '@/lib/contracts';
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+const canPay = contract?.status === 'signed';
+
+// TODO: 実際のURL・口座情報を環境変数から取得
+const TELECOM_CREDIT_URL = import.meta.env.TELECOM_CREDIT_URL || '#';
+const LIFTI_SCHEDULE_URL = import.meta.env.LIFTI_SCHEDULE_URL || '#';
+const BANK_NAME = import.meta.env.BANK_NAME || '（銀行名を設定してください）';
+const BANK_BRANCH = import.meta.env.BANK_BRANCH || '（支店名）';
+const BANK_TYPE = import.meta.env.BANK_TYPE || '普通';
+const BANK_NUMBER = import.meta.env.BANK_NUMBER || '（口座番号）';
+const BANK_HOLDER = import.meta.env.BANK_HOLDER || '（口座名義）';
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>お支払い - 結び</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
+    .header { background: #fff; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .container { max-width: 540px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .price { font-size: 28px; font-weight: 700; color: #1e40af; text-align: center; margin-bottom: 24px; }
+    .bank-info { background: #f9fafb; border-radius: 8px; padding: 16px; }
+    .bank-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+    .bank-row .label { color: #666; }
+    .bank-row .value { font-weight: 600; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-green { background: #059669; color: #fff; }
+    .btn-green:hover { background: #047857; }
+    .note { font-size: 13px; color: #666; margin-top: 12px; line-height: 1.6; }
+    .msg { text-align: center; padding: 60px 20px; }
+    .msg h2 { font-size: 20px; margin-bottom: 12px; }
+    .check-icon { font-size: 48px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>株式会社結び</h1>
+  </div>
+
+  {!contract ? (
+    <div class="container"><div class="msg"><h2>無効なリンク</h2></div></div>
+  ) : !canPay ? (
+    <div class="container"><div class="msg"><h2>この画面は表示できません</h2><p>署名が完了していないか、既に決済済みです。</p></div></div>
+  ) : contract.paymentMethod === 'transfer' ? (
+    <div class="container">
+      <div class="card">
+        <div class="check-icon" style="text-align:center">🏦</div>
+        <h2 style="text-align:center">お振込でのお支払い</h2>
+        <div class="price">&yen;{Number(contract.price).toLocaleString()}</div>
+        <div class="bank-info">
+          <div class="bank-row"><span class="label">銀行名</span><span class="value">{BANK_NAME}</span></div>
+          <div class="bank-row"><span class="label">支店名</span><span class="value">{BANK_BRANCH}</span></div>
+          <div class="bank-row"><span class="label">口座種別</span><span class="value">{BANK_TYPE}</span></div>
+          <div class="bank-row"><span class="label">口座番号</span><span class="value">{BANK_NUMBER}</span></div>
+          <div class="bank-row"><span class="label">口座名義</span><span class="value">{BANK_HOLDER}</span></div>
+        </div>
+        <p class="note">
+          上記口座へお振込ください。振込手数料はお客様のご負担となります。<br>
+          お振込名義はご契約者名「{contract.name}」でお願いいたします。<br>
+          入金確認後、担当者よりご連絡いたします。
+        </p>
+      </div>
+      <a href={`/contract/${token}/complete`} class="btn btn-primary">確認しました</a>
+    </div>
+  ) : contract.paymentMethod === 'credit' ? (
+    <div class="container">
+      <div class="card">
+        <div class="check-icon" style="text-align:center">💳</div>
+        <h2 style="text-align:center">クレジットカード決済</h2>
+        <div class="price">&yen;{Number(contract.price).toLocaleString()}</div>
+        <p class="note" style="text-align:center; margin-bottom: 16px;">
+          「決済画面へ進む」ボタンを押すと、テレコムクレジットの決済画面に移動します。
+        </p>
+        <a href={TELECOM_CREDIT_URL} class="btn btn-primary" target="_blank" rel="noopener">決済画面へ進む</a>
+      </div>
+      <a href={`/contract/${token}/complete`} class="btn btn-green" style="margin-top: 12px;">決済完了後はこちら</a>
+    </div>
+  ) : (
+    <div class="container">
+      <div class="card">
+        <div class="check-icon" style="text-align:center">📅</div>
+        <h2 style="text-align:center">ライフティ お手続きのご案内</h2>
+        <div class="price">&yen;{Number(contract.price).toLocaleString()}</div>
+        <p class="note" style="text-align:center; margin-bottom: 16px;">
+          ライフティのお手続きは別日に行います。<br>
+          下記より日程をご予約ください。
+        </p>
+        <a href={LIFTI_SCHEDULE_URL} class="btn btn-primary" target="_blank" rel="noopener">日程を予約する</a>
+      </div>
+      <a href={`/contract/${token}/complete`} class="btn btn-green" style="margin-top: 12px;">確認しました</a>
+    </div>
+  )}
+</body>
+</html>

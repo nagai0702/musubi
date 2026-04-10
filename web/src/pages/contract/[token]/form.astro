@@ -1,0 +1,200 @@
+---
+import { getByToken } from '@/lib/contracts';
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+const alreadyFilled = contract && contract.status !== 'draft';
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ご契約情報入力 - 結び</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
+    .header { background: #fff; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header p { font-size: 13px; color: #666; margin-top: 4px; }
+    .container { max-width: 540px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
+    .field label .req { color: #ef4444; font-size: 11px; margin-left: 4px; }
+    .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; }
+    .field input:focus, .field select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .check-field { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; }
+    .check-field input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
+    .check-field span { font-size: 13px; line-height: 1.5; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .done { text-align: center; padding: 60px 20px; }
+    .done h2 { font-size: 20px; margin-bottom: 12px; color: #059669; }
+    .error { display: none; padding: 12px; background: #fef2f2; color: #b91c1c; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>株式会社結び</h1>
+    <p>ご契約情報入力フォーム</p>
+  </div>
+
+  {!contract ? (
+    <div class="container">
+      <div class="done">
+        <h2>無効なリンク</h2>
+        <p>このURLは無効です。担当者にお問い合わせください。</p>
+      </div>
+    </div>
+  ) : alreadyFilled ? (
+    <div class="container">
+      <div class="done">
+        <h2>入力完了済み</h2>
+        <p>ご入力ありがとうございました。担当者の手続きをお待ちください。</p>
+      </div>
+    </div>
+  ) : (
+    <div class="container">
+      <div class="error" id="errorMsg"></div>
+      <form id="contractForm">
+        <input type="hidden" name="token" value={token}>
+
+        <div class="card">
+          <h2>お客様情報</h2>
+          <div class="row">
+            <div class="field">
+              <label>お名前<span class="req">必須</span></label>
+              <input type="text" name="name" required placeholder="結び 太郎">
+            </div>
+            <div class="field">
+              <label>お名前フリガナ<span class="req">必須</span></label>
+              <input type="text" name="nameKana" required placeholder="ムスビ タロウ">
+            </div>
+          </div>
+          <div class="field">
+            <label>生年月日<span class="req">必須</span></label>
+            <input type="date" name="birthday" required>
+          </div>
+          <div class="field">
+            <label>電話番号<span class="req">必須</span></label>
+            <input type="tel" name="phone" required placeholder="090-1234-5678">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>ご住所</h2>
+          <div class="field">
+            <label>郵便番号<span class="req">必須</span></label>
+            <input type="text" name="postalCode" required placeholder="123-4567" pattern="\d{3}-?\d{4}">
+          </div>
+          <div class="field">
+            <label>住所<span class="req">必須</span></label>
+            <input type="text" name="address" required placeholder="東京都渋谷区...">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>メールアドレス</h2>
+          <div class="field">
+            <label>メールアドレス<span class="req">必須</span></label>
+            <input type="email" name="email" required placeholder="example@email.com" id="email">
+          </div>
+          <div class="field">
+            <label>メールアドレス（確認用）<span class="req">必須</span></label>
+            <input type="email" name="emailConfirm" required placeholder="もう一度入力してください" id="emailConfirm">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>ご確認事項</h2>
+          <div class="check-field">
+            <input type="checkbox" name="coolingOffAgreed" id="coolingOff" required>
+            <span>クーリングオフの内容について確認しました。契約締結日から8日以内であれば、書面またはメールにて無条件で契約を解除できることを理解しています。</span>
+          </div>
+          <div class="check-field">
+            <input type="checkbox" name="notesAgreed" id="notes" required>
+            <span>契約書締結時の留意点について確認しました。サービス内容、料金体系、契約期間等の重要事項を理解した上で契約に同意します。</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">入力内容を送信する</button>
+      </form>
+    </div>
+  )}
+
+<script is:inline>
+document.getElementById('contractForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  const email = document.getElementById('email').value;
+  const emailConfirm = document.getElementById('emailConfirm').value;
+  if (email !== emailConfirm) {
+    errEl.textContent = 'メールアドレスが一致しません';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  const fd = new FormData(this);
+  const body = {
+    token: fd.get('token'),
+    email: fd.get('email'),
+    name: fd.get('name'),
+    nameKana: fd.get('nameKana'),
+    phone: fd.get('phone'),
+    birthday: fd.get('birthday'),
+    postalCode: fd.get('postalCode'),
+    address: fd.get('address'),
+    coolingOffAgreed: fd.get('coolingOffAgreed') === 'on',
+    notesAgreed: fd.get('notesAgreed') === 'on',
+  };
+
+  try {
+    const res = await fetch('/api/contract/submit-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.querySelector('.container').innerHTML =
+        '<div class="done"><div class="spinner"></div><h2>送信完了</h2><p>ご入力ありがとうございました。<br>担当者が手続き中です。このまましばらくお待ちください...</p></div>';
+      // ポーリング開始: 営業が単価設定したら署名画面へ自動遷移
+      const pollToken = body.token;
+      const poll = setInterval(async () => {
+        try {
+          const sr = await fetch('/api/contract/status?token=' + pollToken);
+          if (!sr.ok) return;
+          const sd = await sr.json();
+          if (sd.status === 'priced' || sd.status === 'signed' || sd.status === 'payment_done') {
+            clearInterval(poll);
+            location.href = '/contract/' + pollToken + '/sign';
+          }
+        } catch {}
+      }, 3000);
+    } else {
+      errEl.textContent = data.error || '送信に失敗しました';
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    errEl.textContent = '通信エラーが発生しました';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.textContent = '入力内容を送信する';
+});
+</script>
+</body>
+</html>
