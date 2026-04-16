@@ -1,4 +1,5 @@
 /** Slack OAuth (Sign in with Slack) + Bot polling */
+import crypto from 'node:crypto';
 
 const CLIENT_ID = import.meta.env.SLACK_CLIENT_ID!;
 const CLIENT_SECRET = import.meta.env.SLACK_CLIENT_SECRET!;
@@ -148,6 +149,37 @@ export async function postToAttendanceChannel(text: string): Promise<void> {
     headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
     body: JSON.stringify({ channel, text })
   });
+}
+
+/** #crm-alert チャンネルに Block Kit メッセージを投稿。text はフォールバック通知用。 */
+export async function postToCrmChannel(params: { text: string; blocks?: any[] }): Promise<void> {
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const channel = import.meta.env.SLACK_CRM_CHANNEL_ID;
+  if (!token || !channel) return;
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ channel, text: params.text, blocks: params.blocks })
+  });
+}
+
+/** Slack署名検証 — スラッシュコマンド等のリクエストで x-slack-signature をチェック */
+export function verifySlackSignature(rawBody: string, timestamp: string | null, signature: string | null): boolean {
+  const secret = import.meta.env.SLACK_SIGNING_SECRET;
+  if (!secret || !timestamp || !signature) return false;
+  // 5分以上古いリクエストは拒否
+  const ts = parseInt(timestamp, 10);
+  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+  const base = `v0:${timestamp}:${rawBody}`;
+  const hash = 'v0=' + crypto.createHmac('sha256', secret).update(base).digest('hex');
+  try {
+    const a = Buffer.from(hash);
+    const b = Buffer.from(signature);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 /* ===== Attendance polling (出勤/退勤のみ) ===== */
