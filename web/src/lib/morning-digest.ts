@@ -170,20 +170,22 @@ function buildBlocks(calendar: CalendarEvent[], emails: GmailThread[], slack: Sl
 }
 
 /** ダイジェスト生成 & 投稿。既に当日分が投稿済みならスキップ。 */
-export async function postDigest(): Promise<void> {
+export async function postDigest(): Promise<string> {
   const channel = DIGEST_CHANNEL();
   const token = BOT_TOKEN();
-  if (!channel || !token) return;
+  if (!channel) return 'no-channel';
+  if (!token) return 'no-token';
 
   // 冪等チェック: 今日の 0:00 JST 以降に投稿済みか
   const todayMidnight = new Date(Date.now() + 9 * 3600_000);
   todayMidnight.setUTCHours(-9, 0, 0, 0);
   const oldest = String(Math.floor(todayMidnight.getTime() / 1000));
   const existing = await slackAPI(`conversations.history?channel=${channel}&oldest=${oldest}&limit=5`);
+  if (!existing.ok) return `history-error:${existing.error}`;
   const already = (existing.messages || []).some(
     (m: any) => m.bot_id && (m.text || '').includes('Daily Digest')
   );
-  if (already) return;
+  if (already) return 'already-posted';
 
   // データ収集（並列）
   const [calResult, emailResult, slackResult] = await Promise.allSettled([
@@ -211,7 +213,9 @@ export async function postDigest(): Promise<void> {
   const blocks = buildBlocks(calendar, emails, slack, aiSummary);
   const fallbackText = `Daily Digest - ${new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)}`;
 
-  await slackAPI('chat.postMessage', { channel, text: fallbackText, blocks });
+  const res = await slackAPI('chat.postMessage', { channel, text: fallbackText, blocks });
+  if (!res.ok) return `post-error:${res.error}`;
+  return `posted:cal=${calendar.length},mail=${emails.length},slack=${slack.length}`;
 }
 
 /* ---------- タスク自動判定 ---------- */

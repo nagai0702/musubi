@@ -80,8 +80,8 @@ export const GET: APIRoute = async ({ request }) => {
 
   // 3. Morning Digest
   try {
-    await postDigest();
-    results.push('morning-digest: posted');
+    const r = await postDigest();
+    results.push(`morning-digest: ${r}`);
   } catch (e: any) {
     results.push(`morning-digest: error - ${e.message}`);
   }
