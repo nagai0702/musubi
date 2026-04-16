@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getLatestPerUser, addAttendance, popLatestReminderId } from '@/lib/sheets';
 import { postToAttendanceChannel, cancelScheduledMessage } from '@/lib/slack';
+import { postDigest } from '@/lib/morning-digest';
 
 const AUTO_CHECKOUT_HOURS = 48;
 
@@ -75,6 +76,14 @@ export const GET: APIRoute = async ({ request }) => {
       `<@${userId}> 退勤を忘れていたから代わりにしておいたロボ～🤖 (出勤から${Math.round(elapsedHours)}時間経過)`
     );
     results.push(`auto-checkout: ${record.userName} (${Math.round(elapsedHours)}h)`);
+  }
+
+  // 3. Morning Digest
+  try {
+    await postDigest();
+    results.push('morning-digest: posted');
+  } catch (e: any) {
+    results.push(`morning-digest: error - ${e.message}`);
   }
 
   return new Response(JSON.stringify({ processed: results.length, details: results }), {
