@@ -2,6 +2,7 @@
 import type { APIRoute } from 'astro';
 import { verifyHisyoSignature, hisyoSlackAPI } from '@/lib/hisyo';
 import { extractAll, buildTasksBlocks } from '@/lib/task-extractor';
+// Vercel Function 最大実行時間は vercel.json で 60秒に設定
 
 export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();

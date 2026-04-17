@@ -58,11 +58,20 @@ async function fetchRecentMessages(days: number): Promise<Array<{ channel: strin
     cursor = res.response_metadata?.next_cursor || undefined;
   } while (cursor);
 
-  // 各チャンネルから最新メッセージ取得
-  for (const ch of channels) {
-    try {
-      const res = await slackAPI(`conversations.history?channel=${ch.id}&oldest=${oldest}&limit=50`);
-      for (const m of res.messages || []) {
+  // 各チャンネルから並列で取得（バッチで制限してレート制限を回避）
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < channels.length; i += BATCH_SIZE) {
+    const batch = channels.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (ch) => {
+        const res = await slackAPI(`conversations.history?channel=${ch.id}&oldest=${oldest}&limit=50`);
+        return { ch, messages: res.messages || [] };
+      })
+    );
+    for (const r of batchResults) {
+      if (r.status !== 'fulfilled') continue;
+      const { ch, messages } = r.value;
+      for (const m of messages) {
         if (m.subtype) continue;
         if (!m.text) continue;
         results.push({
@@ -74,7 +83,7 @@ async function fetchRecentMessages(days: number): Promise<Array<{ channel: strin
           isIm: ch.isIm,
         });
       }
-    } catch {}
+    }
   }
 
   return results;
