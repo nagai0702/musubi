@@ -1,7 +1,7 @@
 /** Slack/Calendar/Gmail から永井のタスクを抽出 */
 import { createTask } from './tasks';
 import { getTodayEvents, type CalendarEvent } from './google-calendar';
-import { getRecentEmails, type GmailThread } from './gmail';
+import { getRecentEmails, autoArchiveEmails, type GmailThread } from './gmail';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
@@ -120,13 +120,17 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
 
   const messages = slackResult.status === 'fulfilled' ? slackResult.value : [];
   const calendar = calResult.status === 'fulfilled' ? calResult.value : [];
-  const emails = emailResult.status === 'fulfilled' ? emailResult.value : [];
+  const rawEmails = emailResult.status === 'fulfilled' ? emailResult.value : [];
+
+  // 自動アーカイブ対象は Gmail 側で INBOX ラベルを外してタスク候補から除外
+  const { archived, remaining: emails } = await autoArchiveEmails(rawEmails);
+  if (archived.length > 0) console.log(`[extractAll] auto-archived ${archived.length} emails`);
 
   // デバッグログ
   if (slackResult.status === 'rejected') console.error('[extractAll] slack:', slackResult.reason?.message || slackResult.reason);
   if (calResult.status === 'rejected') console.error('[extractAll] calendar:', calResult.reason?.message || calResult.reason);
   if (emailResult.status === 'rejected') console.error('[extractAll] gmail:', emailResult.reason?.message || emailResult.reason);
-  console.log(`[extractAll] slack=${messages.length} cal=${calendar.length} mail=${emails.length}`);
+  console.log(`[extractAll] slack=${messages.length} cal=${calendar.length} mail=${emails.length} (archived=${archived.length})`);
 
   // 永井関連のメッセージに絞る（DMは全メッセージ対象）
   const relevant = messages.filter((m) => {

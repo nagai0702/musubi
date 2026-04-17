@@ -106,3 +106,58 @@ export async function getPersonalEmailsNeedingReply(maxResults = 30): Promise<Gm
   const all = await getRecentEmails(maxResults);
   return all.filter((e) => e.isPersonal && e.isUnread);
 }
+
+/** Gmail でメッセージをアーカイブ（INBOX ラベル削除） */
+export async function archiveMessage(messageId: string): Promise<boolean> {
+  const gm = client();
+  try {
+    await gm.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: { removeLabelIds: ['INBOX'] },
+    });
+    return true;
+  } catch (e) {
+    console.error('[gmail] archive failed for', messageId, e);
+    return false;
+  }
+}
+
+/** 自動アーカイブする送信元のパターン（部分一致） */
+export const AUTO_ARCHIVE_SENDERS = [
+  'クラウドリンクス',
+  'crowdlinks',
+  'afb',
+  'afb運営',
+  'LinkedIn',
+  'linkedin.com',
+  'メディアレーダー',
+  'Notta',
+  'notta.ai',
+  'no-reply@notification',
+];
+
+export function shouldAutoArchive(email: GmailThread): boolean {
+  const from = (email.from || '').toLowerCase();
+  const subject = (email.subject || '').toLowerCase();
+  return AUTO_ARCHIVE_SENDERS.some((p) => from.includes(p.toLowerCase()) || subject.includes(p.toLowerCase()));
+}
+
+/** 自動アーカイブ対象のメールを一括アーカイブし、アーカイブしたIDを返す */
+export async function autoArchiveEmails(emails: GmailThread[]): Promise<{ archived: string[]; remaining: GmailThread[] }> {
+  const toArchive: GmailThread[] = [];
+  const remaining: GmailThread[] = [];
+
+  for (const e of emails) {
+    if (shouldAutoArchive(e)) toArchive.push(e);
+    else remaining.push(e);
+  }
+
+  const archivedIds: string[] = [];
+  for (const e of toArchive) {
+    const ok = await archiveMessage(e.id);
+    if (ok) archivedIds.push(e.id);
+  }
+
+  return { archived: archivedIds, remaining };
+}
