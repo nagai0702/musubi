@@ -367,7 +367,13 @@ export function buildTasksBlocks(arg: ExtractedTask[] | ExtractResult, days: num
     text: { type: 'mrkdwn', text: `:clipboard: *タスク候補 ${tasks.length}件*\n_内容を確認してNotionに登録するタスクを選んでください_` },
   });
 
-  tasks.forEach((t, i) => {
+  // Slack Block Kit 上限: 50ブロック/メッセージ
+  // ヘッダー等で ~10 ブロック使うので、タスクは最大 19件まで（1タスク = 2ブロック）
+  const MAX_TASKS_IN_MESSAGE = 19;
+  const displayedTasks = tasks.slice(0, MAX_TASKS_IN_MESSAGE);
+  const overflowCount = tasks.length - displayedTasks.length;
+
+  displayedTasks.forEach((t, i) => {
     const priorityEmoji =
       t.priority === 'High' ? ':red_circle:' : t.priority === 'Medium' ? ':large_orange_circle:' : ':large_blue_circle:';
     const dueText = t.dueDate ? ` | 期日: ${t.dueDate}` : '';
@@ -401,6 +407,14 @@ export function buildTasksBlocks(arg: ExtractedTask[] | ExtractResult, days: num
       ],
     });
   });
+
+  // オーバーフロー通知
+  if (overflowCount > 0) {
+    blocks.push({
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `_他 ${overflowCount} 件のタスクは「すべて登録」で一括登録できます_` }],
+    });
+  }
 
   blocks.push({ type: 'divider' });
   blocks.push({
