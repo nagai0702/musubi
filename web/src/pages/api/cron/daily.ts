@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { getLatestPerUser, addAttendance, popLatestReminderId } from '@/lib/sheets';
 import { postToAttendanceChannel, cancelScheduledMessage } from '@/lib/slack';
 import { postDigest } from '@/lib/morning-digest';
+import { extractAll, buildTasksBlocks } from '@/lib/task-extractor';
+import { hisyoSlackAPI } from '@/lib/hisyo';
 
 const AUTO_CHECKOUT_HOURS = 48;
 
@@ -99,12 +101,41 @@ export const GET: APIRoute = async ({ request }) => {
     results.push(`auto-checkout: ${record.userName} (${Math.round(elapsedHours)}h)`);
   }
 
-  // 3. Morning Digest
+  // 3. Morning Digest (シンプル版)
   try {
     const r = await postDigest();
     results.push(`morning-digest: ${r}`);
   } catch (e: any) {
     results.push(`morning-digest: error - ${e.message}`);
+  }
+
+  // 4. タスク抽出 & ボタン付きタスクリスト投稿（/tasks 相当）
+  try {
+    const digestChannel = import.meta.env.SLACK_DIGEST_CHANNEL_ID;
+
+    // 今日すでにタスクチェック投稿済みならスキップ
+    const todayMidnight = new Date(Date.now() + 9 * 3600_000);
+    todayMidnight.setUTCHours(-9, 0, 0, 0);
+    const oldest = String(Math.floor(todayMidnight.getTime() / 1000));
+    const hist = await hisyoSlackAPI(`conversations.history?channel=${digestChannel}&oldest=${oldest}&limit=10`);
+    const alreadyPosted = (hist.messages || []).some((m: any) =>
+      m.bot_id && (m.text || '').includes('タスクチェック結果')
+    );
+
+    if (alreadyPosted) {
+      results.push('tasks-check: skipped (already posted today)');
+    } else {
+      const result = await extractAll(3);
+      const blocks = buildTasksBlocks(result, 3);
+      await hisyoSlackAPI('chat.postMessage', {
+        channel: digestChannel,
+        text: `タスクチェック結果 (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`,
+        blocks,
+      });
+      results.push(`tasks-check: posted (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`);
+    }
+  } catch (e: any) {
+    results.push(`tasks-check: error - ${e.message}`);
   }
 
   return new Response(JSON.stringify({ processed: results.length, details: results }), {
