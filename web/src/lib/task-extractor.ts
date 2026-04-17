@@ -355,17 +355,33 @@ export function buildTasksBlocks(arg: ExtractedTask[] | ExtractResult, days: num
       t.priority === 'High' ? ':red_circle:' : t.priority === 'Medium' ? ':large_orange_circle:' : ':large_blue_circle:';
     const dueText = t.dueDate ? ` | 期日: ${t.dueDate}` : '';
     const channelText = t.channel ? ` | ${t.channel}` : '';
+    const taskValue = JSON.stringify(t).slice(0, 1900);
 
+    // タスク本文（block_id でマーク）
     blocks.push({
       type: 'section',
+      block_id: `task_section_${i}`,
       text: { type: 'mrkdwn', text: `${priorityEmoji} *${t.title}*\n_${t.reason}_\n${t.priority}${dueText}${channelText}` },
-      accessory: {
-        type: 'button',
-        text: { type: 'plain_text', text: '登録' },
-        style: 'primary',
-        action_id: `add_task_${i}`,
-        value: JSON.stringify(t).slice(0, 1900),
-      },
+    });
+    // 登録 / 登録しない ボタン
+    blocks.push({
+      type: 'actions',
+      block_id: `task_actions_${i}`,
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '登録' },
+          style: 'primary',
+          action_id: `add_task_${i}`,
+          value: taskValue,
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '登録しない' },
+          action_id: `skip_task_${i}`,
+          value: String(i),
+        },
+      ],
     });
   });
 

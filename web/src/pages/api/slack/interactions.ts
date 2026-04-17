@@ -18,6 +18,13 @@ async function slackAPI(method: string, body: any): Promise<any> {
   return res.json();
 }
 
+/** block_id にインデックス i を含むブロックをメッセージから除去 */
+function removeTaskBlocks(blocks: any[], i: number): any[] {
+  const targetSection = `task_section_${i}`;
+  const targetActions = `task_actions_${i}`;
+  return blocks.filter((b: any) => b.block_id !== targetSection && b.block_id !== targetActions);
+}
+
 export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();
   const ts = request.headers.get('x-slack-request-timestamp');
@@ -35,10 +42,13 @@ export const POST: APIRoute = async ({ request }) => {
 
   const channel = payload.channel?.id;
   const messageTs = payload.message?.ts;
+  const messageText = payload.message?.text || '';
+  const messageBlocks: any[] = payload.message?.blocks || [];
 
   // 非同期処理で実行（3秒以内ACKのため）— waitUntil でレスポンス後も継続
   waitUntil((async () => {
     try {
+      // === キャンセル（全消去） ===
       if (action.action_id === 'cancel_tasks') {
         await slackAPI('chat.update', {
           channel,
@@ -49,6 +59,7 @@ export const POST: APIRoute = async ({ request }) => {
         return;
       }
 
+      // === すべて登録 ===
       if (action.action_id === 'add_all_tasks') {
         const tasks = JSON.parse(action.value) as ExtractedTask[];
         const count = await addTasksToNotion(tasks);
@@ -66,16 +77,37 @@ export const POST: APIRoute = async ({ request }) => {
         return;
       }
 
+      // === 個別登録 ===
       if (action.action_id?.startsWith('add_task_')) {
+        const i = parseInt(action.action_id.replace('add_task_', ''), 10);
         const task = JSON.parse(action.value) as ExtractedTask;
         await addTasksToNotion([task]);
-        // 元メッセージにリアクション
-        await slackAPI('reactions.add', { channel, timestamp: messageTs, name: 'white_check_mark' });
+        // メッセージから該当タスクブロックを削除
+        const newBlocks = removeTaskBlocks(messageBlocks, i);
+        await slackAPI('chat.update', {
+          channel,
+          ts: messageTs,
+          text: messageText,
+          blocks: newBlocks,
+        });
         // エフェメラル通知
         await slackAPI('chat.postEphemeral', {
           channel,
           user: payload.user.id,
-          text: `「${task.title}」を登録しました`,
+          text: `:white_check_mark: 「${task.title}」を登録しました`,
+        });
+        return;
+      }
+
+      // === 個別スキップ（登録しない） ===
+      if (action.action_id?.startsWith('skip_task_')) {
+        const i = parseInt(action.action_id.replace('skip_task_', ''), 10);
+        const newBlocks = removeTaskBlocks(messageBlocks, i);
+        await slackAPI('chat.update', {
+          channel,
+          ts: messageTs,
+          text: messageText,
+          blocks: newBlocks,
         });
         return;
       }
