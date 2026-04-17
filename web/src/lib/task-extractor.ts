@@ -224,6 +224,9 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
 - 遠慮なく、思いつく限りの候補を出す
 - 迷ったら「Medium」で出す（無視するより出す）`;
 
+  console.log(`[extractAll] calling Claude (input: ${formatted.length} chars)`);
+  const claudeT0 = Date.now();
+
   const res = await fetch(ANTHROPIC_API, {
     method: 'POST',
     headers: {
@@ -239,17 +242,27 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
     }),
   });
 
-  if (!res.ok) throw new Error(`Claude API failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const errTxt = await res.text();
+    console.error(`[extractAll] Claude error: ${res.status} ${errTxt}`);
+    throw new Error(`Claude API failed: ${res.status} ${errTxt}`);
+  }
   const data = (await res.json()) as any;
+  console.log(`[extractAll] Claude done in ${Date.now() - claudeT0}ms, out tokens: ${data.usage?.output_tokens}`);
   const text = data.content?.[0]?.text || '';
 
   const jsonMatch = text.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) return { tasks: [], calendar, emails };
+  if (!jsonMatch) {
+    console.error('[extractAll] No JSON in Claude response:', text.slice(0, 500));
+    return { tasks: [], calendar, emails };
+  }
 
   try {
     const tasks = JSON.parse(jsonMatch[0]) as ExtractedTask[];
+    console.log(`[extractAll] Parsed ${tasks.length} tasks`);
     return { tasks, calendar, emails };
-  } catch {
+  } catch (e: any) {
+    console.error('[extractAll] JSON parse error:', e.message, '| raw:', jsonMatch[0].slice(0, 500));
     return { tasks: [], calendar, emails };
   }
 }

@@ -26,19 +26,27 @@ export const POST: APIRoute = async ({ request }) => {
   // 非同期処理（3秒以内ACKのため）— waitUntil でレスポンス返却後も実行を継続
   waitUntil(
     (async () => {
+      const bgT0 = Date.now();
+      console.log('[tasks bg] started');
       try {
         const result = await extractAll(days);
+        console.log(`[tasks bg] extractAll done in ${Date.now() - bgT0}ms`);
         const blocks = buildTasksBlocks(result, days);
-        await hisyoSlackAPI('chat.postMessage', {
+        console.log(`[tasks bg] built ${blocks.length} blocks, posting to ${digestChannel}`);
+        const postRes = await hisyoSlackAPI('chat.postMessage', {
           channel: digestChannel,
           text: `タスクチェック結果 (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`,
           blocks,
         });
+        console.log(`[tasks bg] post result: ok=${postRes.ok} error=${postRes.error} total=${Date.now() - bgT0}ms`);
       } catch (e: any) {
-        await hisyoSlackAPI('chat.postMessage', {
-          channel: digestChannel,
-          text: `タスク抽出エラー: ${e.message}\n${(e.stack || '').slice(0, 500)}`,
-        });
+        console.error('[tasks bg] ERROR:', e.message, e.stack?.slice(0, 500));
+        try {
+          await hisyoSlackAPI('chat.postMessage', {
+            channel: digestChannel,
+            text: `タスク抽出エラー: ${e.message}\n${(e.stack || '').slice(0, 500)}`,
+          });
+        } catch {}
       }
     })()
   );
