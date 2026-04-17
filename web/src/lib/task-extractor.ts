@@ -121,7 +121,7 @@ Slackのメッセージ履歴から、以下のいずれかに該当する「未
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: 'user', content: `以下のSlackメッセージを分析し、永井さんの未完了タスクを抽出してください:\n\n${formatted}` }],
