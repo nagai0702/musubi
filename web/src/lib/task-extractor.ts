@@ -1,7 +1,7 @@
 /** Slack/Calendar/Gmail から永井のタスクを抽出 */
 import { createTask } from './tasks';
 import { getTodayEvents, type CalendarEvent } from './google-calendar';
-import { getPersonalEmailsNeedingReply, type GmailThread } from './gmail';
+import { getRecentEmails, type GmailThread } from './gmail';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
@@ -115,7 +115,7 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const [slackResult, calResult, emailResult] = await Promise.allSettled([
     fetchRecentMessages(days),
     getTodayEvents(),
-    getPersonalEmailsNeedingReply(30),
+    getRecentEmails(50),
   ]);
 
   const messages = slackResult.status === 'fulfilled' ? slackResult.value : [];
@@ -157,31 +157,49 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
     .slice(0, 60000); // Claude の入力制限を考慮（ざっくり60KBまで）
 
   const emailText = emails
-    .slice(0, 30)
-    .map((e) => `[${e.isImportant ? '重要' : '通常'}] From: ${e.from} | 件名: ${e.subject} | ${e.snippet.slice(0, 200)}`)
-    .join('\n');
+    .map((e) => {
+      const flags = [
+        e.isImportant ? '重要' : '',
+        e.isUnread ? '未読' : '',
+        e.isMass ? '自動送信の可能性' : '',
+      ].filter(Boolean).join(',');
+      return `[${flags}] From: ${e.from} | 件名: ${e.subject} | 内容: ${e.snippet.slice(0, 300)}`;
+    })
+    .join('\n')
+    .slice(0, 30000);
 
   const formatted = `
-=== Slack メッセージ（永井関連） ===
+=== Slack メッセージ（永井関連 & DM） ===
 ${slackText || '(該当なし)'}
 
-=== 個人メール（一斉配信除外済み） ===
+=== 受信メール（${emails.length}件・自動送信系も含む。判定はあなたに任せる） ===
 ${emailText || '(該当なし)'}
 `;
 
   const systemPrompt = `あなたは株式会社結びの経営者・永井さんの秘書です。
 SlackのメッセージとGmailから、以下のいずれかに該当する「未完了」のタスクを抽出してください:
+
+【タスクとして拾うもの】
 1. 永井さんが「やります」「対応します」「確認します」などと宣言したもの
 2. 他の人から永井さんに依頼・質問されたもの
 3. 永井さんが検討・決定すべき事項
-4. 個人メールで返信が必要なもの（質問・依頼・相談）
+4. メールで、業務上アクションが必要なもの。以下のような場合:
+   - 契約書の署名依頼・合意完了通知（次のアクション確認必要）
+   - エラー・障害通知（システム対応必要）
+   - 支払い・請求に関する通知（確認・対応必要）
+   - 人からの個別質問・相談
+   - ビジネス上重要な外部サービスからの通知（スケジュール確認、返信期限等）
 
-【重要】以下は除外してください:
+【除外するもの】
 - すでに相手からの返信で完了と判断できるもの
 - 単なる雑談・相槌
 - 既に別の人が引き取った作業
-- 会議の日程調整など、特定の時点で完了する細かいやりとり
-- メールマガジン、自動通知、広告などの一斉配信
+- 単なるメルマガ、広告、ニュースレター
+- 「スカウトしてみませんか」などの営業メール
+- LinkedIn等SNSの通知（つながり申請など、業務と無関係）
+- カレンダーの単なる予定リマインダー（本人が予定を入れた系）
+
+メールの「自動送信の可能性」フラグは参考情報。自動送信でも業務対応必要なら拾う。
 
 出力はJSON配列のみ。説明文なし。
 形式:
