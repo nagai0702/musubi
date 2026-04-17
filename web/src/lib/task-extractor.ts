@@ -2,7 +2,7 @@
 import { createTask } from './tasks';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const BOT_TOKEN = () => import.meta.env.SLACK_BOT_TOKEN!;
+const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
 const OWNER_USER_ID = () => import.meta.env.SLACK_OWNER_USER_ID!;
 
 async function slackAPI(method: string, body?: any): Promise<any> {

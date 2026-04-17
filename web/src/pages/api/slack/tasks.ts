@@ -1,13 +1,13 @@
 /** Slack スラッシュコマンド /tasks — 過去のSlackを解析して永井のタスクを抽出 */
 import type { APIRoute } from 'astro';
-import { verifySlackSignature } from '@/lib/slack';
+import { verifyHisyoSignature } from '@/lib/hisyo';
 import { extractTasks, sendDM, buildTasksBlocks } from '@/lib/task-extractor';
 
 export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();
   const ts = request.headers.get('x-slack-request-timestamp');
   const sig = request.headers.get('x-slack-signature');
-  if (!verifySlackSignature(raw, ts, sig)) {
+  if (!verifyHisyoSignature(raw, ts, sig)) {
     return new Response('invalid signature', { status: 401 });
   }
 

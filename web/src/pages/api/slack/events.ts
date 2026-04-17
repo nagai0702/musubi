@@ -1,6 +1,6 @@
 /** Slack Events API — メッセージ受信 → タスク自動判定 */
 import type { APIRoute } from 'astro';
-import { verifySlackSignature } from '@/lib/slack';
+import { verifyHisyoSignature } from '@/lib/hisyo';
 import { classifyAndCreateTask } from '@/lib/morning-digest';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -22,7 +22,7 @@ export const POST: APIRoute = async ({ request }) => {
   // 署名検証
   const ts = request.headers.get('x-slack-request-timestamp');
   const sig = request.headers.get('x-slack-signature');
-  if (!verifySlackSignature(raw, ts, sig)) {
+  if (!verifyHisyoSignature(raw, ts, sig)) {
     return new Response('invalid signature', { status: 401 });
   }
 

@@ -1,9 +1,9 @@
 /** Slack Interactivity — ボタンクリック処理（タスク登録など） */
 import type { APIRoute } from 'astro';
-import { verifySlackSignature } from '@/lib/slack';
+import { verifyHisyoSignature } from '@/lib/hisyo';
 import { addTasksToNotion, type ExtractedTask } from '@/lib/task-extractor';
 
-const BOT_TOKEN = () => import.meta.env.SLACK_BOT_TOKEN!;
+const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
 
 async function slackAPI(method: string, body: any): Promise<any> {
   const res = await fetch(`https://slack.com/api/${method}`, {
@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();
   const ts = request.headers.get('x-slack-request-timestamp');
   const sig = request.headers.get('x-slack-signature');
-  if (!verifySlackSignature(raw, ts, sig)) {
+  if (!verifyHisyoSignature(raw, ts, sig)) {
     return new Response('invalid signature', { status: 401 });
   }
 

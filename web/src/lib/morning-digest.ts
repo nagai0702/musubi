@@ -4,7 +4,7 @@ import { getRecentEmails, type GmailThread } from './gmail';
 import { createTask } from './tasks';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const BOT_TOKEN = () => import.meta.env.SLACK_BOT_TOKEN!;
+const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
 const DIGEST_CHANNEL = () => import.meta.env.SLACK_DIGEST_CHANNEL_ID!;
 /** 監視チャンネル。"all" の場合は Bot が参加しているチャンネルを全取得。 */
 async function getWatchChannels(): Promise<string[]> {
