@@ -8,10 +8,5 @@
       "path": "/api/cron/crm-silence-check",
       "schedule": "0 0 * * *"
     }
-  ],
-  "functions": {
-    "src/pages/api/slack/tasks.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }

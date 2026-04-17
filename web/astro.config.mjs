@@ -6,7 +6,7 @@ const isVercel = process.env.VERCEL === '1';
 
 export default defineConfig({
   output: 'server',
-  adapter: isVercel ? vercel() : node({ mode: 'standalone' }),
+  adapter: isVercel ? vercel({ maxDuration: 60 }) : node({ mode: 'standalone' }),
   server: { host: true },
   vite: {
     server: {

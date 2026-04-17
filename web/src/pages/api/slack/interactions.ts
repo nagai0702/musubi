@@ -1,5 +1,6 @@
 /** Slack Interactivity — ボタンクリック処理（タスク登録など） */
 import type { APIRoute } from 'astro';
+import { waitUntil } from '@vercel/functions';
 import { verifyHisyoSignature } from '@/lib/hisyo';
 import { addTasksToNotion, type ExtractedTask } from '@/lib/task-extractor';
 
@@ -35,8 +36,8 @@ export const POST: APIRoute = async ({ request }) => {
   const channel = payload.channel?.id;
   const messageTs = payload.message?.ts;
 
-  // 非同期処理で実行（3秒以内ACKのため）
-  queueMicrotask(async () => {
+  // 非同期処理で実行（3秒以内ACKのため）— waitUntil でレスポンス後も継続
+  waitUntil((async () => {
     try {
       if (action.action_id === 'cancel_tasks') {
         await slackAPI('chat.update', {
@@ -81,7 +82,7 @@ export const POST: APIRoute = async ({ request }) => {
     } catch (e) {
       console.error('[slack/interactions] error:', e);
     }
-  });
+  })());
 
   return new Response('', { status: 200 });
 };

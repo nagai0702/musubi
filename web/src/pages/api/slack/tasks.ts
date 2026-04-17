@@ -1,8 +1,9 @@
 /** Slack スラッシュコマンド /tasks — 過去のSlackを解析して永井のタスクを抽出 */
 import type { APIRoute } from 'astro';
+import { waitUntil } from '@vercel/functions';
 import { verifyHisyoSignature, hisyoSlackAPI } from '@/lib/hisyo';
 import { extractAll, buildTasksBlocks } from '@/lib/task-extractor';
-// Vercel Function 最大実行時間は vercel.json で 60秒に設定
+// maxDuration は astro.config.mjs で vercel({ maxDuration: 60 }) に設定
 
 export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();
@@ -22,23 +23,25 @@ export const POST: APIRoute = async ({ request }) => {
 
   const digestChannel = import.meta.env.SLACK_DIGEST_CHANNEL_ID;
 
-  // 非同期処理（3秒以内ACKのため）
-  queueMicrotask(async () => {
-    try {
-      const result = await extractAll(days);
-      const blocks = buildTasksBlocks(result, days);
-      await hisyoSlackAPI('chat.postMessage', {
-        channel: digestChannel,
-        text: `タスクチェック結果 (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`,
-        blocks,
-      });
-    } catch (e: any) {
-      await hisyoSlackAPI('chat.postMessage', {
-        channel: digestChannel,
-        text: `タスク抽出エラー: ${e.message}`,
-      });
-    }
-  });
+  // 非同期処理（3秒以内ACKのため）— waitUntil でレスポンス返却後も実行を継続
+  waitUntil(
+    (async () => {
+      try {
+        const result = await extractAll(days);
+        const blocks = buildTasksBlocks(result, days);
+        await hisyoSlackAPI('chat.postMessage', {
+          channel: digestChannel,
+          text: `タスクチェック結果 (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`,
+          blocks,
+        });
+      } catch (e: any) {
+        await hisyoSlackAPI('chat.postMessage', {
+          channel: digestChannel,
+          text: `タスク抽出エラー: ${e.message}\n${(e.stack || '').slice(0, 500)}`,
+        });
+      }
+    })()
+  );
 
   // 即レス
   return new Response(
