@@ -53,10 +53,31 @@ export const GET: APIRoute = async ({ request }) => {
 
   const results: string[] = [];
 
-  // 1. 朝のお知らせ
+  // 1. 朝のお知らせ（冪等: 今日すでに投稿済みならスキップ）
   const msg = todayMessage();
-  await postToAttendanceChannel(`/お知らせ ${msg}`);
-  results.push(`morning: ${msg}`);
+  const token = import.meta.env.SLACK_BOT_TOKEN;
+  const attCh = import.meta.env.SLACK_ATTENDANCE_CHANNEL_ID;
+  let morningSkipped = false;
+  if (token && attCh) {
+    const todayMidnight = new Date(Date.now() + 9 * 3600_000);
+    todayMidnight.setUTCHours(-9, 0, 0, 0);
+    const oldest = String(Math.floor(todayMidnight.getTime() / 1000));
+    try {
+      const r = await fetch(`https://slack.com/api/conversations.history?channel=${attCh}&oldest=${oldest}&limit=20`, {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const d = (await r.json()) as any;
+      if (d.ok && (d.messages || []).some((m: any) => m.bot_id && (m.text || '').includes('/お知らせ'))) {
+        morningSkipped = true;
+      }
+    } catch {}
+  }
+  if (!morningSkipped) {
+    await postToAttendanceChannel(`/お知らせ ${msg}`);
+    results.push(`morning: ${msg}`);
+  } else {
+    results.push('morning: skipped (already posted today)');
+  }
 
   // 2. 48時間超え自動退勤
   const latest = await getLatestPerUser();
