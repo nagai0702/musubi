@@ -24,6 +24,7 @@ export type ExtractedTask = {
   dueDate?: string;
   reason: string; // 根拠となるメッセージ概要
   channel?: string;
+  sourceUrl?: string; // Slack メッセージ URL or Gmail URL
 };
 
 export type ExtractResult = {
@@ -89,6 +90,30 @@ async function fetchRecentMessages(days: number): Promise<Array<{ channel: strin
   return results;
 }
 
+/** Slack team ID (ワークスペースドメイン) を取得（キャッシュ） */
+let cachedTeamDomain: string | null = null;
+async function getTeamDomain(): Promise<string> {
+  if (cachedTeamDomain) return cachedTeamDomain;
+  try {
+    const res = await slackAPI('auth.test');
+    cachedTeamDomain = res.url ? new URL(res.url).hostname.split('.')[0] : 'musubi-en';
+  } catch {
+    cachedTeamDomain = 'musubi-en';
+  }
+  return cachedTeamDomain!;
+}
+
+/** Slack メッセージの permalink URL を構築 */
+function buildSlackUrl(workspace: string, channelId: string, ts: string): string {
+  const tsClean = ts.replace('.', '');
+  return `https://${workspace}.slack.com/archives/${channelId}/p${tsClean}`;
+}
+
+/** Gmail メッセージの URL を構築 */
+function buildGmailUrl(messageId: string): string {
+  return `https://mail.google.com/mail/u/0/#inbox/${messageId}`;
+}
+
 /** Slack user ID からユーザー名を取得（キャッシュ付き） */
 const userNameCache = new Map<string, string>();
 async function getUserName(userId: string): Promise<string> {
@@ -151,16 +176,20 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const uniqueUsers = Array.from(new Set(relevant.map((m) => m.user).filter(Boolean)));
   await Promise.all(uniqueUsers.map((u) => getUserName(u)));
 
-  // Claude に渡すため整形（すべてのメッセージを時系列で渡す、古い順）
+  // Slack ワークスペースドメイン（URL構築用）
+  const workspace = await getTeamDomain();
+
+  // Claude に渡すため整形（URL 付き、時系列で古い順）
   const slackText = relevant
     .sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts))
     .map((m) => {
       const userName = m.user === ownerId ? '永井' : (userNameCache.get(m.user) || m.user);
       const prefix = m.isIm ? `[DM:${m.channel}]` : `[#${m.channel}]`;
-      return `${prefix} ${userName}: ${m.text}`;
+      const url = buildSlackUrl(workspace, m.channelId, m.ts);
+      return `${prefix} ${userName}: ${m.text}\n  → URL: ${url}`;
     })
     .join('\n')
-    .slice(0, 60000); // Claude の入力制限を考慮（ざっくり60KBまで）
+    .slice(0, 60000);
 
   const emailText = emails
     .map((e) => {
@@ -169,7 +198,8 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
         e.isUnread ? '未読' : '',
         e.isMass ? '自動送信の可能性' : '',
       ].filter(Boolean).join(',');
-      return `[${flags}] From: ${e.from} | 件名: ${e.subject} | 内容: ${e.snippet.slice(0, 300)}`;
+      const url = buildGmailUrl(e.id);
+      return `[${flags}] From: ${e.from} | 件名: ${e.subject} | 内容: ${e.snippet.slice(0, 300)}\n  → URL: ${url}`;
     })
     .join('\n')
     .slice(0, 30000);
@@ -224,9 +254,16 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
     "priority": "High" | "Medium" | "Low",
     "dueDate": "YYYY-MM-DD" (あれば、なければ省略),
     "reason": "なぜこれがタスクか、根拠となる会話の概要（100文字以内）",
-    "channel": "チャンネル名 または メール"
+    "channel": "チャンネル名 または メール",
+    "sourceUrl": "タスクの根拠となる Slack メッセージ or メールの URL（必ず入れる）"
   }
 ]
+
+【sourceUrl の扱い】
+- 入力データの各メッセージ/メールに「→ URL: ...」でURLが付いています
+- タスクの根拠となった発言のURLを sourceUrl に必ず含めてください
+- 複数発言が根拠の場合、最も重要な1つのURLを選んでください
+- URLがない場合のみ省略可
 
 優先度の基準:
 - High: 期日が今週中、または経営に直結する重要事項、個人メールで返信未送信
@@ -389,13 +426,14 @@ export function buildTasksBlocks(arg: ExtractedTask[] | ExtractResult, days: num
       t.priority === 'High' ? ':red_circle:' : t.priority === 'Medium' ? ':large_orange_circle:' : ':large_blue_circle:';
     const dueText = t.dueDate ? ` | 期日: ${t.dueDate}` : '';
     const channelText = t.channel ? ` | ${t.channel}` : '';
+    const urlText = t.sourceUrl ? ` | <${t.sourceUrl}|元メッセージ>` : '';
     const taskValue = JSON.stringify(t).slice(0, 1900);
 
     // タスク本文（block_id でマーク）
     blocks.push({
       type: 'section',
       block_id: `task_section_${i}`,
-      text: { type: 'mrkdwn', text: `${priorityEmoji} *${t.title}*\n_${t.reason}_\n${t.priority}${dueText}${channelText}` },
+      text: { type: 'mrkdwn', text: `${priorityEmoji} *${t.title}*\n_${t.reason}_\n${t.priority}${dueText}${channelText}${urlText}` },
     });
     // 登録 / 登録しない ボタン
     blocks.push({
@@ -454,12 +492,16 @@ export async function addTasksToNotion(tasks: ExtractedTask[]): Promise<number> 
   let count = 0;
   for (const t of tasks) {
     try {
+      // sourceMessage に URL + 理由を含めて保存（Notion でクリックできるように）
+      const sourceMessage = t.sourceUrl
+        ? `${t.sourceUrl}\n\n${t.reason}`
+        : t.reason;
       await createTask({
         title: t.title,
         priority: t.priority,
         dueDate: t.dueDate,
         source: 'slack',
-        sourceMessage: t.reason,
+        sourceMessage,
       });
       count++;
     } catch (e) {
