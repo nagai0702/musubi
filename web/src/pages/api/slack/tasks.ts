@@ -1,7 +1,7 @@
 /** Slack スラッシュコマンド /tasks — 過去のSlackを解析して永井のタスクを抽出 */
 import type { APIRoute } from 'astro';
 import { verifyHisyoSignature, hisyoSlackAPI } from '@/lib/hisyo';
-import { extractTasks, buildTasksBlocks } from '@/lib/task-extractor';
+import { extractAll, buildTasksBlocks } from '@/lib/task-extractor';
 
 export const POST: APIRoute = async ({ request }) => {
   const raw = await request.text();
@@ -24,11 +24,11 @@ export const POST: APIRoute = async ({ request }) => {
   // 非同期処理（3秒以内ACKのため）
   queueMicrotask(async () => {
     try {
-      const tasks = await extractTasks(days);
-      const blocks = buildTasksBlocks(tasks, days);
+      const result = await extractAll(days);
+      const blocks = buildTasksBlocks(result, days);
       await hisyoSlackAPI('chat.postMessage', {
         channel: digestChannel,
-        text: `タスク抽出完了 (${tasks.length}件)`,
+        text: `タスクチェック結果 (予定${result.calendar.length}/メール${result.emails.length}/タスク${result.tasks.length})`,
         blocks,
       });
     } catch (e: any) {
