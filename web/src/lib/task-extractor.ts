@@ -37,13 +37,17 @@ async function fetchRecentMessages(days: number): Promise<Array<{ channel: strin
   const oldest = String(Math.floor(Date.now() / 1000) - days * 86400);
   const results: Array<{ channel: string; channelId: string; text: string; user: string; ts: string }> = [];
 
-  // Bot が参加中のチャンネル一覧
+  // Bot が参加中のチャンネル一覧（im は im:read スコープが必要なので除外）
   let cursor: string | undefined;
   const channels: Array<{ id: string; name: string }> = [];
   do {
     const qs = cursor ? `&cursor=${cursor}` : '';
-    const res = await slackAPI(`users.conversations?types=public_channel,private_channel,im&limit=200${qs}`);
-    for (const ch of res.channels || []) channels.push({ id: ch.id, name: ch.name || ch.user || 'dm' });
+    const res = await slackAPI(`users.conversations?types=public_channel,private_channel&limit=200${qs}`);
+    if (!res.ok) {
+      console.error('[task-extractor] users.conversations failed:', res.error);
+      break;
+    }
+    for (const ch of res.channels || []) channels.push({ id: ch.id, name: ch.name || 'channel' });
     cursor = res.response_metadata?.next_cursor || undefined;
   } while (cursor);
 
