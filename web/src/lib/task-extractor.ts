@@ -216,7 +216,13 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
 優先度の基準:
 - High: 期日が今週中、または経営に直結する重要事項、個人メールで返信未送信
 - Medium: 通常業務
-- Low: 長期構想・検討事項`;
+- Low: 長期構想・検討事項
+
+【抽出の姿勢】
+- 網羅的に、細かいものも含めて抽出してください。10件〜30件出ても問題ありません
+- 同じ案件でも、別アクションが必要なら別タスクとして出す
+- 遠慮なく、思いつく限りの候補を出す
+- 迷ったら「Medium」で出す（無視するより出す）`;
 
   const res = await fetch(ANTHROPIC_API, {
     method: 'POST',
@@ -226,10 +232,10 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4000,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8000,
       system: systemPrompt,
-      messages: [{ role: 'user', content: `以下の情報を分析し、永井さんの未完了タスクを抽出してください:\n${formatted}` }],
+      messages: [{ role: 'user', content: `以下の情報を分析し、永井さんの未完了タスクを網羅的に抽出してください。10件以上あるはずなので漏れなくピックアップしてください:\n${formatted}` }],
     }),
   });
 
