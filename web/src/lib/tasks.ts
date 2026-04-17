@@ -154,3 +154,25 @@ export async function listTasks(status?: string): Promise<Task[]> {
 export async function updateTaskStatus(pageId: string, status: string): Promise<void> {
   await updatePage(pageId, { 'ステータス': buildSelect(status) });
 }
+
+/** タスク候補を「スキップ」ステータスで記録（次回以降の抽出から除外するため） */
+export async function recordSkippedTask(params: {
+  title: string;
+  sourceMessage?: string;
+}): Promise<void> {
+  const properties: Record<string, any> = {
+    'タスク名': buildTitle(params.title),
+    'ステータス': buildSelect('Skipped'),
+    'ソース': buildSelect('slack'),
+  };
+  if (params.sourceMessage) {
+    properties['元メッセージ'] = buildRichText(params.sourceMessage.slice(0, 1800));
+  }
+  await createPage({ database_id: getDbId() }, properties);
+}
+
+/** 既存タスクのタイトル一覧を取得（抽出時の重複除外用） */
+export async function listAllTaskTitles(): Promise<string[]> {
+  const pages = await queryDatabase(getDbId(), {});
+  return pages.map(toTask).map((t) => t.title).filter(Boolean);
+}

@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { waitUntil } from '@vercel/functions';
 import { verifyHisyoSignature } from '@/lib/hisyo';
 import { addTasksToNotion, type ExtractedTask } from '@/lib/task-extractor';
+import { recordSkippedTask } from '@/lib/tasks';
 
 const BOT_TOKEN = () => import.meta.env.HISYO_BOT_TOKEN!;
 
@@ -102,6 +103,24 @@ export const POST: APIRoute = async ({ request }) => {
       // === 個別スキップ（登録しない） ===
       if (action.action_id?.startsWith('skip_task_')) {
         const i = parseInt(action.action_id.replace('skip_task_', ''), 10);
+
+        // 該当タスクを messageBlocks から探してタイトル取得 → Notion にスキップ記録
+        const sectionBlock = messageBlocks.find((b: any) => b.block_id === `task_section_${i}`);
+        const sectionText: string = sectionBlock?.text?.text || '';
+        // フォーマット: ":red_circle: *タスク名*\n_理由_\n..."
+        const titleMatch = sectionText.match(/\*(.+?)\*/);
+        const reasonMatch = sectionText.match(/_(.+?)_/);
+        const title = titleMatch?.[1]?.trim() || '';
+        const reason = reasonMatch?.[1]?.trim() || '';
+
+        if (title) {
+          try {
+            await recordSkippedTask({ title, sourceMessage: reason });
+          } catch (e) {
+            console.error('[interactions] recordSkippedTask failed:', e);
+          }
+        }
+
         const newBlocks = removeTaskBlocks(messageBlocks, i);
         await slackAPI('chat.update', {
           channel,

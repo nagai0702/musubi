@@ -1,5 +1,5 @@
 /** Slack/Calendar/Gmail から永井のタスクを抽出 */
-import { createTask } from './tasks';
+import { createTask, listAllTaskTitles } from './tasks';
 import { getTodayEvents, type CalendarEvent } from './google-calendar';
 import { getRecentEmails, autoArchiveEmails, type GmailThread } from './gmail';
 
@@ -112,11 +112,13 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const ownerId = OWNER_USER_ID();
 
   // 並列でデータ取得
-  const [slackResult, calResult, emailResult] = await Promise.allSettled([
+  const [slackResult, calResult, emailResult, existingTitlesResult] = await Promise.allSettled([
     fetchRecentMessages(days),
     getTodayEvents(),
     getRecentEmails(50),
+    listAllTaskTitles(),
   ]);
+  const existingTitles = existingTitlesResult.status === 'fulfilled' ? existingTitlesResult.value : [];
 
   const messages = slackResult.status === 'fulfilled' ? slackResult.value : [];
   const calendar = calResult.status === 'fulfilled' ? calResult.value : [];
@@ -172,7 +174,14 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
     .join('\n')
     .slice(0, 30000);
 
+  const excludedTitlesText = existingTitles.length > 0
+    ? existingTitles.slice(0, 200).map((t) => `- ${t}`).join('\n')
+    : '(なし)';
+
   const formatted = `
+=== 既に処理済み or 却下済みのタスク（重複して出さないこと） ===
+${excludedTitlesText}
+
 === Slack メッセージ（永井関連 & DM） ===
 ${slackText || '(該当なし)'}
 
@@ -202,6 +211,8 @@ SlackのメッセージとGmailから、以下のいずれかに該当する「�
 - 「スカウトしてみませんか」などの営業メール
 - LinkedIn等SNSの通知（つながり申請など、業務と無関係）
 - カレンダーの単なる予定リマインダー（本人が予定を入れた系）
+- 「既に処理済み or 却下済みのタスク」リストに類似するもの（永井さんが過去に「登録しない」と判断した or 既に登録済み）
+  → タイトルが完全一致しなくても、同じ案件・同じアクションなら除外する
 
 メールの「自動送信の可能性」フラグは参考情報。自動送信でも業務対応必要なら拾う。
 
