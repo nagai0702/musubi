@@ -33,21 +33,28 @@ export type ExtractResult = {
 };
 
 /** 過去 days 日分の監視対象チャンネルからメッセージを取得 */
-async function fetchRecentMessages(days: number): Promise<Array<{ channel: string; channelId: string; text: string; user: string; ts: string }>> {
+async function fetchRecentMessages(days: number): Promise<Array<{ channel: string; channelId: string; text: string; user: string; ts: string; isIm: boolean }>> {
   const oldest = String(Math.floor(Date.now() / 1000) - days * 86400);
-  const results: Array<{ channel: string; channelId: string; text: string; user: string; ts: string }> = [];
+  const results: Array<{ channel: string; channelId: string; text: string; user: string; ts: string; isIm: boolean }> = [];
 
-  // Bot が参加中のチャンネル一覧（im は im:read スコープが必要なので除外）
+  // Bot が参加中のチャンネル一覧（DM/グループDM含む）
   let cursor: string | undefined;
-  const channels: Array<{ id: string; name: string }> = [];
+  const channels: Array<{ id: string; name: string; isIm: boolean; user?: string }> = [];
   do {
     const qs = cursor ? `&cursor=${cursor}` : '';
-    const res = await slackAPI(`users.conversations?types=public_channel,private_channel&limit=200${qs}`);
+    const res = await slackAPI(`users.conversations?types=public_channel,private_channel,im,mpim&limit=200${qs}`);
     if (!res.ok) {
       console.error('[task-extractor] users.conversations failed:', res.error);
       break;
     }
-    for (const ch of res.channels || []) channels.push({ id: ch.id, name: ch.name || 'channel' });
+    for (const ch of res.channels || []) {
+      channels.push({
+        id: ch.id,
+        name: ch.name || (ch.is_im ? `DM` : 'channel'),
+        isIm: !!ch.is_im || !!ch.is_mpim,
+        user: ch.user,
+      });
+    }
     cursor = res.response_metadata?.next_cursor || undefined;
   } while (cursor);
 
@@ -64,12 +71,28 @@ async function fetchRecentMessages(days: number): Promise<Array<{ channel: strin
           text: m.text.slice(0, 500),
           user: m.user || '',
           ts: m.ts,
+          isIm: ch.isIm,
         });
       }
     } catch {}
   }
 
   return results;
+}
+
+/** Slack user ID からユーザー名を取得（キャッシュ付き） */
+const userNameCache = new Map<string, string>();
+async function getUserName(userId: string): Promise<string> {
+  if (!userId) return '';
+  if (userNameCache.has(userId)) return userNameCache.get(userId)!;
+  try {
+    const res = await slackAPI(`users.info?user=${userId}`);
+    const name = res.user?.real_name || res.user?.profile?.display_name || res.user?.name || userId;
+    userNameCache.set(userId, name);
+    return name;
+  } catch {
+    return userId;
+  }
 }
 
 /** Claude でタスク抽出（Slack + Calendar + Gmail） */
@@ -90,8 +113,9 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const calendar = calResult.status === 'fulfilled' ? calResult.value : [];
   const emails = emailResult.status === 'fulfilled' ? emailResult.value : [];
 
-  // 永井関連のメッセージに絞る
+  // 永井関連のメッセージに絞る（DMは全メッセージ対象）
   const relevant = messages.filter((m) => {
+    if (m.isIm) return true; // DM/グループDMは全てが1:1会話なので全部対象
     if (m.user === ownerId) return true;
     if (m.text.includes(`<@${ownerId}>`)) return true;
     if (m.text.includes('永井')) return true;
@@ -102,10 +126,18 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
     return { tasks: [], calendar, emails };
   }
 
+  // Slack ユーザー名を解決（ユニークな user ID について）
+  const uniqueUsers = Array.from(new Set(relevant.map((m) => m.user).filter(Boolean)));
+  await Promise.all(uniqueUsers.map((u) => getUserName(u)));
+
   // Claude に渡すため整形
   const slackText = relevant
     .slice(-200)
-    .map((m) => `[#${m.channel}] ${m.user === ownerId ? '永井' : m.user}: ${m.text}`)
+    .map((m) => {
+      const userName = m.user === ownerId ? '永井' : (userNameCache.get(m.user) || m.user);
+      const prefix = m.isIm ? `[DM:${m.channel}]` : `[#${m.channel}]`;
+      return `${prefix} ${userName}: ${m.text}`;
+    })
     .join('\n');
 
   const emailText = emails
