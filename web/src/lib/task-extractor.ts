@@ -122,6 +122,12 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const calendar = calResult.status === 'fulfilled' ? calResult.value : [];
   const emails = emailResult.status === 'fulfilled' ? emailResult.value : [];
 
+  // デバッグログ
+  if (slackResult.status === 'rejected') console.error('[extractAll] slack:', slackResult.reason?.message || slackResult.reason);
+  if (calResult.status === 'rejected') console.error('[extractAll] calendar:', calResult.reason?.message || calResult.reason);
+  if (emailResult.status === 'rejected') console.error('[extractAll] gmail:', emailResult.reason?.message || emailResult.reason);
+  console.log(`[extractAll] slack=${messages.length} cal=${calendar.length} mail=${emails.length}`);
+
   // 永井関連のメッセージに絞る（DMは全メッセージ対象）
   const relevant = messages.filter((m) => {
     if (m.isIm) return true; // DM/グループDMは全てが1:1会話なので全部対象
@@ -139,15 +145,16 @@ export async function extractAll(days = 7): Promise<ExtractResult> {
   const uniqueUsers = Array.from(new Set(relevant.map((m) => m.user).filter(Boolean)));
   await Promise.all(uniqueUsers.map((u) => getUserName(u)));
 
-  // Claude に渡すため整形
+  // Claude に渡すため整形（すべてのメッセージを時系列で渡す、古い順）
   const slackText = relevant
-    .slice(-200)
+    .sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts))
     .map((m) => {
       const userName = m.user === ownerId ? '永井' : (userNameCache.get(m.user) || m.user);
       const prefix = m.isIm ? `[DM:${m.channel}]` : `[#${m.channel}]`;
       return `${prefix} ${userName}: ${m.text}`;
     })
-    .join('\n');
+    .join('\n')
+    .slice(0, 60000); // Claude の入力制限を考慮（ざっくり60KBまで）
 
   const emailText = emails
     .slice(0, 30)
