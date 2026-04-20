@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>恋愛・婚活バズコンテンツ リサーチダッシュボード 2026-04-20</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1116;
+    --bg-2: #161b22;
+    --bg-3: #1f2630;
+    --border: #2d343e;
+    --text: #e6edf3;
+    --text-dim: #8b98a5;
+    --accent: #ff6b9d;
+    --accent-2: #ffa94d;
+    --yt: #ff3b3b;
+    --seo: #3ddc84;
+    --x: #e4e4e7;
+    --shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Yu Gothic UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.7;
+    font-size: 14px;
+  }
+  header.hero {
+    background: linear-gradient(135deg, #1a1f2e 0%, #2a1d3a 50%, #3a1a2a 100%);
+    padding: 48px 40px 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-meta {
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #ff6b9d 0%, #ffa94d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  .hero-sub {
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 820px;
+  }
+  .tag-row { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  main { padding: 32px 40px 80px; max-width: 1400px; margin: 0 auto; }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .kpi-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: "";
+    position: absolute; inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--accent);
+  }
+  .kpi-card.yt::before { background: var(--yt); }
+  .kpi-card.seo::before { background: var(--seo); }
+  .kpi-card.x::before { background: var(--x); }
+  .kpi-card.total::before { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%); }
+  .kpi-label {
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .kpi-value .unit { font-size: 14px; color: var(--text-dim); font-weight: 500; margin-left: 4px; }
+  .kpi-note { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+  .insights {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 26px;
+    margin-bottom: 28px;
+  }
+  .insights h2 { font-size: 16px; margin-bottom: 14px; color: var(--accent-2); }
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .insight {
+    background: var(--bg-3);
+    border-radius: 8px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--accent);
+  }
+  .insight:nth-child(2) { border-left-color: var(--accent-2); }
+  .insight:nth-child(3) { border-left-color: var(--seo); }
+  .insight-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .insight-body {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.65;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    padding-top: 4px;
+  }
+  .tab {
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    font-family: inherit;
+    transition: color 0.15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .count {
+    font-size: 11px;
+    background: rgba(255,255,255,0.08);
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+  }
+  .tab.active .count { background: var(--accent); color: #fff; }
+
+  .panel {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 28px 32px;
+    min-height: 600px;
+  }
+  .panel.hidden { display: none; }
+
+  /* Markdown styling inside panels */
+  .md h1 { font-size: 22px; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .md h2 { font-size: 17px; margin: 28px 0 12px; color: var(--accent-2); }
+  .md h3 { font-size: 15px; margin: 20px 0 8px; color: var(--text); }
+  .md p { margin: 8px 0; color: var(--text); }
+  .md ul, .md ol { margin: 8px 0 8px 24px; }
+  .md li { margin: 3px 0; }
+  .md strong { color: var(--accent); font-weight: 700; }
+  .md hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .md code {
+    background: var(--bg-3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+  }
+  .md pre { background: var(--bg-3); padding: 14px; border-radius: 8px; overflow-x: auto; }
+  .md pre code { background: none; padding: 0; }
+  .md table {
+    border-collapse: collapse;
+    margin: 12px 0;
+    width: 100%;
+    font-size: 12.5px;
+    display: block;
+    overflow-x: auto;
+  }
+  .md table thead { background: var(--bg-3); }
+  .md table th, .md table td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .md table th { color: var(--accent-2); font-weight: 700; }
+  .md table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .md a { color: #6fb3ff; text-decoration: none; }
+  .md a:hover { text-decoration: underline; }
+  .md blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 6px 14px;
+    color: var(--text-dim);
+    background: var(--bg-3);
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .loading {
+    padding: 80px 20px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .spinner {
+    display: inline-block;
+    width: 24px; height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  @media (max-width: 720px) {
+    header.hero { padding: 32px 20px; }
+    .hero h1 { font-size: 24px; }
+    main { padding: 20px 16px 60px; }
+    .panel { padding: 18px; }
+    .tab { padding: 10px 12px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-meta">RESEARCH · 2026-04-20 · 株式会社結び</div>
+  <h1>恋愛・婚活バズコンテンツ リサーチダッシュボード</h1>
+  <p class="hero-sub">
+    日本の恋愛・婚活領域で直近1年（2025-04〜2026-04）にバズったコンテンツを、YouTube / SEO / X の3プラットフォーム横断で収集。
+    競合リサーチとコンテンツ企画に活用するための一次情報集。
+  </p>
+  <div class="tag-row">
+    <span class="tag">YouTube ~120</span>
+    <span class="tag">SEO 109</span>
+    <span class="tag">X 92+16</span>
+    <span class="tag">期間: 2025-04〜2026-04</span>
+    <span class="tag">用途: 競合リサーチ／コンテンツ企画</span>
+  </div>
+</header>
+
+<main>
+
+<!-- KPI cards -->
+<section class="kpi-grid">
+  <div class="kpi-card yt">
+    <div class="kpi-label">YouTube</div>
+    <div class="kpi-value">120<span class="unit">件</span></div>
+    <div class="kpi-note">動画 ~90 + チャンネル 30</div>
+  </div>
+  <div class="kpi-card seo">
+    <div class="kpi-label">SEO（Google.co.jp）</div>
+    <div class="kpi-value">109<span class="unit">URL</span></div>
+    <div class="kpi-note">30 KWバケット</div>
+  </div>
+  <div class="kpi-card x">
+    <div class="kpi-label">X（Twitter）</div>
+    <div class="kpi-value">92<span class="unit">+16</span></div>
+    <div class="kpi-note">バズ投稿 + 影響力アカウント</div>
+  </div>
+  <div class="kpi-card total">
+    <div class="kpi-label">合計エントリ</div>
+    <div class="kpi-value">337<span class="unit">件</span></div>
+    <div class="kpi-note">一次情報トレース済み</div>
+  </div>
+</section>
+
+<!-- Cross-platform insights -->
+<section class="insights">
+  <h2>🔥 プラットフォーム横断の共通インサイト</h2>
+  <div class="insight-grid">
+    <div class="insight">
+      <div class="insight-title">① 仲人・カウンセラー実名発信が圧倒的</div>
+      <div class="insight-body">
+        YouTube（仲人T・来島美幸・植草美幸）、SEO（note「仲人T」）、X（現場あるある）いずれも個人名の一次体験が勝ち筋。
+        <strong>株式会社結びも経営者／カウンセラー個人名を前面に。</strong>
+      </div>
+    </div>
+    <div class="insight">
+      <div class="insight-title">② 共通バズテーマ</div>
+      <div class="insight-body">
+        ハイスペ職業論（弁護士・医師・コンサル）／アラサー婚活のリアル／アプリ卒業→相談所ジャーニー／男女非対称（上方婚論）／婚活モンスターあるある
+        ── の5つが3プラ共通で再生産されている。
+      </div>
+    </div>
+    <div class="insight">
+      <div class="insight-title">③ 勝てる空白領域</div>
+      <div class="insight-body">
+        男性向け悩み系（婚活疲れ／諦め／30代後半男）／地方×年代マトリクスSEO／成婚者リユニオン動画／独自n数調査＋PR TIMES。
+        Tier1競合が未カバーの余地あり。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tabs -->
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="summary">📋 サマリ</button>
+  <button class="tab" data-tab="priority">⭐ 優先KW <span class="count">100</span></button>
+  <button class="tab" data-tab="calendar">📅 3ヶ月カレンダー <span class="count">NEW</span></button>
+  <button class="tab" data-tab="graph">🗺 KWグラフ <span class="count">875</span></button>
+  <button class="tab" data-tab="keyword-map">🎯 顧客KWマップ</button>
+  <button class="tab" data-tab="youtube">▶ YouTube <span class="count">120</span></button>
+  <button class="tab" data-tab="seo">🔍 SEO <span class="count">109</span></button>
+  <button class="tab" data-tab="x">𝕏 Twitter <span class="count">92</span></button>
+</nav>
+
+<section class="panel" data-panel="summary">
+  <div class="md" id="md-summary"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="priority">
+  <div class="md" id="md-priority"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="calendar">
+  <div class="md" id="md-calendar"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="graph" style="padding:0; overflow:hidden; border-radius:0 0 12px 12px;">
+  <iframe id="graph-iframe" src="about:blank" style="width:100%; height:820px; border:none; display:block; border-radius:0 0 12px 12px;"></iframe>
+</section>
+<section class="panel hidden" data-panel="keyword-map">
+  <div class="md" id="md-keyword-map"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="youtube">
+  <div class="md" id="md-youtube"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="seo">
+  <div class="md" id="md-seo"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+<section class="panel hidden" data-panel="x">
+  <div class="md" id="md-x"><div class="loading"><div class="spinner"></div></div></div>
+</section>
+
+</main>
+
+<footer>
+  株式会社結び · Internal Competitive Research · Generated 2026-04-20 · データ品質: 定量値は情報源記載のみ記録
+</footer>
+
+<script>
+  const files = {
+    summary: "README.md",
+    priority: "priority-keywords.md",
+    calendar: "content-calendar.md",
+    "keyword-map": "keyword-map.md",
+    youtube: "youtube.md",
+    seo: "seo.md",
+    x: "x.md"
+  };
+  const loaded = {};
+
+  async function loadPanel(key) {
+    if (loaded[key]) return;
+    if (key === "graph") {
+      const iframe = document.getElementById("graph-iframe");
+      if (iframe && iframe.src === "about:blank") iframe.src = "keyword-graph.html";
+      loaded[key] = true;
+      return;
+    }
+    const target = document.getElementById("md-" + key);
+    try {
+      const res = await fetch(files[key] + "?v=" + Date.now());
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const md = await res.text();
+      const html = marked.parse(md, { breaks: false, gfm: true });
+      target.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+      // Open external links in new tab
+      target.querySelectorAll('a[href^="http"]').forEach(a => {
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener');
+      });
+      loaded[key] = true;
+    } catch (e) {
+      target.innerHTML = '<div class="loading" style="color:#ff6b6b">読み込みエラー: ' + e.message + '<br><small>' + files[key] + '</small></div>';
+    }
+  }
+
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.tab;
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === btn));
+      document.querySelectorAll(".panel").forEach(p => {
+        p.classList.toggle("hidden", p.dataset.panel !== key);
+      });
+      loadPanel(key);
+    });
+  });
+
+  // Initial load
+  loadPanel("summary");
+</script>
+
+</body>
+</html>

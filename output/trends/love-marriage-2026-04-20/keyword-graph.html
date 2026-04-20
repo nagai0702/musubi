@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>顧客キーワードマップ（27-39歳男性・年収400-700万）</title>
+<script src="https://cdn.jsdelivr.net/npm/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #0e1116; height: 100%; overflow: hidden; }
+  body { font-family: "Hiragino Sans", "Yu Gothic UI", sans-serif; color: #e6edf3; }
+  #network { width: 100vw; height: 100vh; background: radial-gradient(ellipse at center, #161b22 0%, #0e1116 80%); }
+
+  .panel {
+    position: absolute; z-index: 10;
+    background: rgba(22, 27, 34, 0.94);
+    backdrop-filter: blur(8px);
+    border: 1px solid #2d343e;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  }
+  .panel h1, .panel h2 { margin: 0; }
+
+  #panel-header { top: 14px; left: 14px; padding: 14px 18px; max-width: 360px; }
+  #panel-header h1 { font-size: 15px; color: #ffa94d; margin-bottom: 6px; }
+  #panel-header p { font-size: 11.5px; color: #8b98a5; line-height: 1.5; margin: 0 0 6px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; margin-right: 4px; }
+  .pill-brand { background: rgba(255,107,157,0.15); color: #ff6b9d; }
+  .pill-info { background: rgba(77,171,247,0.15); color: #4dabf7; }
+
+  #panel-stats { top: 14px; left: 50%; transform: translateX(-50%); padding: 10px 18px; display: flex; gap: 22px; }
+  .stat { text-align: center; }
+  .stat-val { font-size: 18px; font-weight: 700; color: #e6edf3; }
+  .stat-label { font-size: 10px; color: #8b98a5; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  #panel-filter { top: 14px; right: 14px; padding: 14px 16px; width: 280px; max-height: calc(100vh - 28px); overflow-y: auto; }
+  #panel-filter h2 { font-size: 12px; color: #ffa94d; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .filter-section { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #2d343e; }
+  .filter-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .filter-section h3 { font-size: 11px; color: #e6edf3; margin-bottom: 6px; font-weight: 600; }
+  .cluster-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-size: 11.5px; transition: background 0.15s; }
+  .cluster-toggle:hover { background: rgba(255,255,255,0.04); }
+  .cluster-toggle input { cursor: pointer; }
+  .cluster-swatch { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .cluster-count { margin-left: auto; font-size: 10px; color: #8b98a5; }
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-row input[type="range"] { flex: 1; }
+  .slider-val { font-size: 11px; color: #ffa94d; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+  .search-box { width: 100%; padding: 6px 10px; background: #1f2630; border: 1px solid #2d343e; border-radius: 6px; color: #e6edf3; font-size: 12px; font-family: inherit; }
+  .search-box::placeholder { color: #5b6572; }
+  .btn-row { display: flex; gap: 6px; margin-top: 8px; }
+  .btn { flex: 1; padding: 6px 10px; background: #2d343e; border: 1px solid #3d4653; color: #e6edf3; border-radius: 5px; cursor: pointer; font-size: 11px; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: #3d4653; }
+  .btn-primary { background: #ff6b9d; border-color: #ff6b9d; color: white; }
+  .btn-primary:hover { background: #ff4d89; border-color: #ff4d89; }
+
+  #panel-controls { bottom: 14px; left: 14px; padding: 10px 14px; font-size: 11px; color: #8b98a5; }
+  #panel-controls kbd { background: #1f2630; border: 1px solid #2d343e; padding: 1px 6px; border-radius: 3px; font-size: 10px; color: #e6edf3; margin: 0 2px; }
+
+  #panel-selected { bottom: 14px; right: 14px; padding: 14px 16px; max-width: 320px; display: none; }
+  #panel-selected.active { display: block; }
+  #panel-selected h3 { font-size: 13px; color: #ffa94d; margin-bottom: 6px; }
+  #panel-selected .sel-kw { font-size: 16px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
+  #panel-selected .sel-meta { font-size: 11.5px; color: #8b98a5; line-height: 1.6; }
+  #panel-selected .sel-meta strong { color: #ff6b9d; }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(14, 17, 22, 0.85);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    z-index: 100; color: #8b98a5; font-size: 13px;
+  }
+  .spinner { width: 36px; height: 36px; border: 3px solid #2d343e; border-top-color: #ff6b9d; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .err { color: #ff6b6b; font-size: 12px; padding: 12px; background: rgba(255,107,107,0.1); border-radius: 6px; border: 1px solid rgba(255,107,107,0.3); }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div id="loading-text">KWデータを読み込み中...</div>
+</div>
+
+<div id="network"></div>
+
+<div class="panel" id="panel-header">
+  <h1>🎯 顧客キーワードマップ</h1>
+  <p>27-39歳男性 / 年収400-700万 / 結婚相談所の潜在〜顕在顧客</p>
+  <span class="pill pill-brand">株式会社結び</span>
+  <span class="pill pill-info" id="date-pill">2026-04-20</span>
+</div>
+
+<div class="panel" id="panel-stats">
+  <div class="stat"><div class="stat-val" id="stat-kw">0</div><div class="stat-label">Keywords</div></div>
+  <div class="stat"><div class="stat-val" id="stat-cl">0</div><div class="stat-label">Clusters</div></div>
+  <div class="stat"><div class="stat-val" id="stat-sub">0</div><div class="stat-label">Sub-clusters</div></div>
+  <div class="stat"><div class="stat-val" id="stat-vol">0</div><div class="stat-label">Total Vol/月</div></div>
+</div>
+
+<div class="panel" id="panel-filter">
+  <h2>🎚 フィルター</h2>
+
+  <div class="filter-section">
+    <h3>検索</h3>
+    <input class="search-box" type="text" id="search-input" placeholder="KWで絞り込み..." />
+  </div>
+
+  <div class="filter-section">
+    <h3>最小検索Vol</h3>
+    <div class="slider-row">
+      <input type="range" id="vol-slider" min="0" max="50000" step="100" value="0" />
+      <span class="slider-val" id="vol-val">0</span>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <h3>クラスター表示</h3>
+    <div id="cluster-toggles"></div>
+  </div>
+
+  <div class="filter-section">
+    <h3>CV距離</h3>
+    <div id="cv-toggles"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="btn-reset">リセット</button>
+    <button class="btn btn-primary" id="btn-top100">Top 100のみ</button>
+  </div>
+</div>
+
+<div class="panel" id="panel-controls">
+  <kbd>ドラッグ</kbd>移動 · <kbd>ホイール</kbd>拡縮 · <kbd>クリック</kbd>選択 · <kbd>ダブルクリック</kbd>フォーカス
+</div>
+
+<div class="panel" id="panel-selected">
+  <h3>選択したKW</h3>
+  <div class="sel-kw" id="sel-kw">—</div>
+  <div class="sel-meta" id="sel-meta"></div>
+</div>
+
+<script>
+let DATA = null;
+let network = null;
+let allNodes = new Map();  // id -> node object
+let allEdges = [];
+let nodesDS = null;
+let edgesDS = null;
+
+const INTENT_LABELS = {
+  informational: "情報収集",
+  navigational: "指名検索",
+  commercial: "比較検討",
+  transactional: "行動意図"
+};
+
+function setLoading(on, text) {
+  const overlay = document.getElementById("loading-overlay");
+  document.getElementById("loading-text").textContent = text || "読み込み中...";
+  overlay.style.display = on ? "flex" : "none";
+}
+
+function fmtNum(n) {
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/,'') + "万";
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/,'') + "k";
+  return String(n);
+}
+
+async function loadData() {
+  try {
+    const res = await fetch("keyword-data.json?v=" + Date.now());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fallback starter data if keyword-data.json doesn't exist yet
+function fallbackData() {
+  return {
+    meta: { persona: "27-39歳男性・年収400-700万・独身", total_keywords: 0, note: "keyword-data.json の生成をお待ちください" },
+    clusters: [
+      { id: "1", name: "結婚相談所・婚活", color: "#ff4d6d", cv_distance: "顕在", subclusters: [
+        { id: "1-a", name: "(データ生成中)", keywords: [{kw: "データ生成中...", vol: 1000, intent: "informational", notes: ""}] }
+      ]}
+    ]
+  };
+}
+
+function buildGraph(data) {
+  const nodes = [];
+  const edges = [];
+
+  // Central node
+  nodes.push({
+    id: "CENTER",
+    label: "結婚相談所\n27-39歳男性",
+    value: 180,
+    color: { background: "#ffffff", border: "#ff6b9d", highlight: { background: "#fff3f6", border: "#ff4d6d" } },
+    font: { color: "#1a1f2e", size: 20, face: "Hiragino Sans, sans-serif", bold: true, multi: true },
+    shape: "dot",
+    borderWidth: 4,
+    shadow: { enabled: true, color: "rgba(255,107,157,0.6)", size: 30 },
+    fixed: false,
+    _type: "center"
+  });
+
+  data.clusters.forEach(cluster => {
+    const hubId = "C_" + cluster.id;
+    const kwCount = cluster.subclusters.reduce((a,s) => a + s.keywords.length, 0);
+
+    nodes.push({
+      id: hubId,
+      label: cluster.name + "\n" + kwCount + "KW",
+      value: 90,
+      color: { background: cluster.color, border: "#ffffff", highlight: { background: cluster.color, border: "#ffa94d" } },
+      font: { color: "#ffffff", size: 13, face: "Hiragino Sans, sans-serif", bold: true, multi: true, strokeWidth: 2, strokeColor: "#000000" },
+      shape: "dot",
+      borderWidth: 3,
+      _type: "cluster",
+      _cluster: cluster.id,
+      _cvDistance: cluster.cv_distance
+    });
+    edges.push({
+      from: "CENTER", to: hubId,
+      color: { color: cluster.color, opacity: 0.6 },
+      width: 3,
+      smooth: { type: "continuous" }
+    });
+
+    cluster.subclusters.forEach(sub => {
+      const subId = "S_" + sub.id;
+      const subColor = cluster.color;
+
+      nodes.push({
+        id: subId,
+        label: sub.name + " (" + sub.keywords.length + ")",
+        value: 45,
+        color: { background: "rgba(0,0,0,0.4)", border: subColor, highlight: { background: subColor, border: "#ffa94d" } },
+        font: { color: subColor, size: 11, face: "Hiragino Sans, sans-serif", bold: true },
+        shape: "dot",
+        borderWidth: 2,
+        _type: "subcluster",
+        _cluster: cluster.id,
+        _cvDistance: cluster.cv_distance
+      });
+      edges.push({
+        from: hubId, to: subId,
+        color: { color: subColor, opacity: 0.4 },
+        width: 1.5,
+        smooth: { type: "continuous" }
+      });
+
+      sub.keywords.forEach(k => {
+        const leafId = "K_" + cluster.id + "_" + sub.id + "_" + k.kw;
+        const vol = k.vol || 100;
+        nodes.push({
+          id: leafId,
+          label: k.kw + "\n" + fmtNum(vol),
+          value: Math.sqrt(vol),
+          color: {
+            background: subColor,
+            border: "rgba(255,255,255,0.25)",
+            highlight: { background: "#ffffff", border: subColor }
+          },
+          font: { color: "#ffffff", size: 10, face: "Hiragino Sans, sans-serif", multi: true, strokeWidth: 1, strokeColor: "#000000" },
+          shape: "dot",
+          borderWidth: 1,
+          _type: "keyword",
+          _cluster: cluster.id,
+          _cvDistance: cluster.cv_distance,
+          _kw: k.kw,
+          _vol: vol,
+          _intent: k.intent || "",
+          _notes: k.notes || "",
+          _subcluster: sub.name,
+          _clusterName: cluster.name,
+          title: `${k.kw}\n推定Vol: ${vol.toLocaleString()}\nサブ: ${sub.name}${k.intent ? "\n意図: "+INTENT_LABELS[k.intent] : ""}${k.notes ? "\n"+k.notes : ""}`
+        });
+        edges.push({
+          from: subId, to: leafId,
+          color: { color: subColor, opacity: 0.3 },
+          width: 0.8,
+          smooth: { type: "continuous" }
+        });
+      });
+    });
+  });
+
+  return { nodes, edges };
+}
+
+function updateStats(data) {
+  const clusterCount = data.clusters.length;
+  let subCount = 0, kwCount = 0, volSum = 0;
+  data.clusters.forEach(c => {
+    subCount += c.subclusters.length;
+    c.subclusters.forEach(s => {
+      kwCount += s.keywords.length;
+      s.keywords.forEach(k => { volSum += (k.vol || 0); });
+    });
+  });
+  document.getElementById("stat-kw").textContent = kwCount.toLocaleString();
+  document.getElementById("stat-cl").textContent = clusterCount;
+  document.getElementById("stat-sub").textContent = subCount;
+  document.getElementById("stat-vol").textContent = fmtNum(volSum);
+}
+
+function buildClusterToggles(data) {
+  const container = document.getElementById("cluster-toggles");
+  container.innerHTML = "";
+  data.clusters.forEach(c => {
+    const kwCount = c.subclusters.reduce((a,s) => a + s.keywords.length, 0);
+    const label = document.createElement("label");
+    label.className = "cluster-toggle";
+    label.innerHTML = `
+      <input type="checkbox" checked data-cluster="${c.id}" />
+      <span class="cluster-swatch" style="background:${c.color}"></span>
+      <span>${c.name}</span>
+      <span class="cluster-count">${kwCount}</span>
+    `;
+    label.querySelector("input").addEventListener("change", applyFilters);
+    container.appendChild(label);
+  });
+
+  // CV distance toggles
+  const cvContainer = document.getElementById("cv-toggles");
+  cvContainer.innerHTML = "";
+  ["顕在", "準顕在", "潜在"].forEach(cv => {
+    const color = cv === "顕在" ? "#ff4d6d" : cv === "準顕在" ? "#ff922b" : "#4dabf7";
+    const label = document.createElement("label");
+    label.className = "cluster-toggle";
+    label.innerHTML = `
+      <input type="checkbox" checked data-cv="${cv}" />
+      <span class="cluster-swatch" style="background:${color}"></span>
+      <span>${cv}</span>
+    `;
+    label.querySelector("input").addEventListener("change", applyFilters);
+    cvContainer.appendChild(label);
+  });
+}
+
+function applyFilters() {
+  if (!network) return;
+  const activeClusters = new Set(
+    [...document.querySelectorAll('[data-cluster]:checked')].map(i => i.dataset.cluster)
+  );
+  const activeCv = new Set(
+    [...document.querySelectorAll('[data-cv]:checked')].map(i => i.dataset.cv)
+  );
+  const minVol = parseInt(document.getElementById("vol-slider").value, 10);
+  const search = document.getElementById("search-input").value.trim().toLowerCase();
+
+  // Collect visible node ids
+  const visible = new Set(["CENTER"]);
+  allNodes.forEach((node, id) => {
+    if (node._type === "center") { visible.add(id); return; }
+    const cl = node._cluster;
+    const cv = node._cvDistance;
+    if (!activeClusters.has(cl)) return;
+    if (!activeCv.has(cv)) return;
+    if (node._type === "keyword") {
+      if (node._vol < minVol) return;
+      if (search && !node._kw.toLowerCase().includes(search)) return;
+    }
+    visible.add(id);
+  });
+
+  // Update DataSets
+  const updateNodes = [];
+  allNodes.forEach((node, id) => {
+    updateNodes.push({ id, hidden: !visible.has(id) });
+  });
+  nodesDS.update(updateNodes);
+
+  // Hide edges where either endpoint is hidden
+  const updateEdges = allEdges.map(e => ({
+    id: e.id,
+    hidden: !visible.has(e.from) || !visible.has(e.to)
+  }));
+  edgesDS.update(updateEdges);
+}
+
+function init() {
+  buildClusterToggles(DATA);
+  updateStats(DATA);
+
+  const { nodes, edges } = buildGraph(DATA);
+  nodes.forEach(n => allNodes.set(n.id, n));
+  edges.forEach((e, i) => { e.id = "e" + i; allEdges.push(e); });
+
+  nodesDS = new vis.DataSet(nodes);
+  edgesDS = new vis.DataSet(allEdges);
+
+  const container = document.getElementById("network");
+  const options = {
+    nodes: {
+      scaling: {
+        min: 8, max: 60,
+        label: { enabled: true, min: 9, max: 18, drawThreshold: 5 }
+      }
+    },
+    edges: {
+      smooth: { type: "continuous", roundness: 0.2 },
+      arrows: { to: { enabled: false } }
+    },
+    physics: {
+      enabled: true,
+      barnesHut: {
+        gravitationalConstant: -5000,
+        centralGravity: 0.15,
+        springLength: 110,
+        springConstant: 0.03,
+        damping: 0.55,
+        avoidOverlap: 0.15
+      },
+      stabilization: { iterations: 600, updateInterval: 50 }
+    },
+    interaction: {
+      hover: true,
+      tooltipDelay: 150,
+      zoomView: true,
+      dragView: true,
+      hideEdgesOnDrag: true
+    },
+    layout: { improvedLayout: nodes.length < 400 }
+  };
+  network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
+
+  network.once("stabilizationIterationsDone", () => {
+    network.setOptions({ physics: { enabled: false } });
+    setLoading(false);
+  });
+
+  // In case stabilization takes too long
+  setTimeout(() => setLoading(false), 8000);
+
+  network.on("selectNode", (params) => {
+    const id = params.nodes[0];
+    const n = allNodes.get(id);
+    if (!n || n._type !== "keyword") {
+      document.getElementById("panel-selected").classList.remove("active");
+      return;
+    }
+    document.getElementById("panel-selected").classList.add("active");
+    document.getElementById("sel-kw").textContent = n._kw;
+    document.getElementById("sel-meta").innerHTML = `
+      <strong>月間Vol</strong>: ${n._vol.toLocaleString()}<br>
+      <strong>クラスター</strong>: ${n._clusterName}<br>
+      <strong>サブ</strong>: ${n._subcluster}<br>
+      <strong>CV距離</strong>: ${n._cvDistance}<br>
+      ${n._intent ? "<strong>意図</strong>: " + INTENT_LABELS[n._intent] + "<br>" : ""}
+      ${n._notes ? "<em>" + n._notes + "</em>" : ""}
+    `;
+  });
+  network.on("deselectNode", () => {
+    document.getElementById("panel-selected").classList.remove("active");
+  });
+  network.on("doubleClick", (params) => {
+    if (params.nodes.length) {
+      network.focus(params.nodes[0], { scale: 1.4, animation: { duration: 600 } });
+    }
+  });
+
+  // Wire filter events
+  const slider = document.getElementById("vol-slider");
+  const volVal = document.getElementById("vol-val");
+  slider.addEventListener("input", () => { volVal.textContent = fmtNum(parseInt(slider.value, 10)); });
+  slider.addEventListener("change", applyFilters);
+  volVal.textContent = "0";
+
+  document.getElementById("search-input").addEventListener("input", applyFilters);
+
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    document.querySelectorAll('#panel-filter input[type="checkbox"]').forEach(cb => cb.checked = true);
+    slider.value = 0; volVal.textContent = "0";
+    document.getElementById("search-input").value = "";
+    applyFilters();
+  });
+
+  document.getElementById("btn-top100").addEventListener("click", () => {
+    // Sort all keyword nodes by vol desc, take top 100
+    const leafs = [...allNodes.values()].filter(n => n._type === "keyword").sort((a,b) => b._vol - a._vol);
+    const top100Ids = new Set(leafs.slice(0, 100).map(n => n.id));
+    nodesDS.update([...allNodes.values()].map(n => ({
+      id: n.id,
+      hidden: n._type === "keyword" ? !top100Ids.has(n.id) : false
+    })));
+    edgesDS.update(allEdges.map(e => {
+      const fromNode = allNodes.get(e.from);
+      const toNode = allNodes.get(e.to);
+      const fromHidden = fromNode._type === "keyword" && !top100Ids.has(e.from);
+      const toHidden = toNode._type === "keyword" && !top100Ids.has(e.to);
+      return { id: e.id, hidden: fromHidden || toHidden };
+    }));
+  });
+}
+
+(async () => {
+  setLoading(true, "keyword-data.json を読み込み中...");
+  DATA = await loadData();
+  if (!DATA) {
+    setLoading(true, "keyword-data.json が未生成です — バックグラウンドエージェントの完了をお待ちください");
+    DATA = fallbackData();
+  } else {
+    const d = DATA.meta?.created || "2026-04-20";
+    document.getElementById("date-pill").textContent = d + " · " + (DATA.meta?.total_keywords || "?") + "KW";
+  }
+  setLoading(true, "グラフ構築中...");
+  setTimeout(init, 100);
+})();
+</script>
+
+</body>
+</html>
