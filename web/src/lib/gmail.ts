@@ -132,6 +132,7 @@ export const AUTO_ARCHIVE_SENDERS = [
   'LinkedIn',
   'linkedin.com',
   'メディアレーダー',
+  'media-radar.jp',
   'Notta',
   'notta.ai',
   'no-reply@notification',
