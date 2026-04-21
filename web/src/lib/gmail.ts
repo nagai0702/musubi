@@ -136,6 +136,10 @@ export const AUTO_ARCHIVE_SENDERS = [
   'Notta',
   'notta.ai',
   'no-reply@notification',
+  'カシモWiMAX',
+  'kashimo',
+  'ラクスル',
+  'raksul',
 ];
 
 export function shouldAutoArchive(email: GmailThread): boolean {

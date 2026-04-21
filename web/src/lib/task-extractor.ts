@@ -338,8 +338,13 @@ export async function sendDM(userId: string, text: string, blocks?: any[]): Prom
 
 function formatTime(iso: string): string {
   if (!iso.includes('T')) return '終日';
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  // Vercel は UTC 実行なので明示的に Asia/Tokyo で整形
+  return new Date(iso).toLocaleTimeString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 function cleanFromName(from: string): string {
