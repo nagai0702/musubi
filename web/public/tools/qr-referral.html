@@ -54,7 +54,7 @@
 
     <label>担当者名（〇〇に入る部分）</label>
     <input type="text" id="nameInput" placeholder="例: 山田" autocomplete="off">
-    <div class="help">URLの <code>ad_namae=リファラル_〇〇_none_LP00_000</code> の〇〇に入ります</div>
+    <div class="help">URLの <code>ad_name=リファラル_〇〇_none_LP00_000</code> の〇〇に入ります</div>
 
     <div style="margin-top:14px;">
       <button class="primary" id="generateBtn" style="width:100%;">生成する</button>
@@ -72,8 +72,8 @@
         <button class="secondary" id="copyShortBtn">短縮URLをコピー</button>
       </div>
 
-      <div class="out-label" style="margin-top:14px;">ad_namae 値</div>
-      <div class="url-box" id="adNamaeBox">—</div>
+      <div class="out-label" style="margin-top:14px;">ad_name 値</div>
+      <div class="url-box" id="adNameBox">—</div>
 
       <div class="out-label" style="margin-top:14px;">元のURL（エンコード済）</div>
       <div class="url-box" id="longUrlBox">—</div>
@@ -109,9 +109,9 @@
 
 <script>
 // ===== Fixed config =====
-// Base URL: ad_namae パラメータ手前まで。ad_namae の値は別途エンコードして付与する。
+// Base URL: ad_name パラメータ手前まで。ad_name の値は別途エンコードして付与する。
 const LIFF_URL_BASE = 'https://liff.line.me/2009460950-47mPuMwM/landing?follow=%40595ywnpg&lp=6PsRnk&liff_id=2009460950-47mPuMwM';
-const AD_NAMAE_TEMPLATE = 'リファラル_〇〇_none_LP00_000';
+const AD_NAME_TEMPLATE = 'リファラル_〇〇_none_LP00_000';
 
 // Template image path (placed at web/public/tools/template.png → served at /tools/template.png)
 const TEMPLATE_IMG_PATH = './template.png';
@@ -129,7 +129,7 @@ const els = {
   generateBtn: document.getElementById('generateBtn'),
   outSection: document.getElementById('outSection'),
   shortUrlBox: document.getElementById('shortUrlBox'),
-  adNamaeBox: document.getElementById('adNamaeBox'),
+  adNameBox: document.getElementById('adNameBox'),
   longUrlBox: document.getElementById('longUrlBox'),
   copyShortBtn: document.getElementById('copyShortBtn'),
   qrCanvas: document.getElementById('qrCanvas'),
@@ -149,15 +149,15 @@ const state = {
   lastLong: '',
   lastShort: '',
   lastName: '',
-  lastAdNamae: '',
+  lastAdName: '',
 };
 
 // ===== URL construction & shortening =====
-function buildAdNamae(name) { return AD_NAMAE_TEMPLATE.replace('〇〇', name); }
-// ad_namae の値全体（"リファラル_〇〇_none_LP00_000"）を丸ごとURLエンコードして付与する
+function buildAdName(name) { return AD_NAME_TEMPLATE.replace('〇〇', name); }
+// ad_name の値全体（"リファラル_〇〇_none_LP00_000"）を丸ごとURLエンコードして付与する
 function buildLongUrl(name) {
-  const adNamaeValue = buildAdNamae(name);
-  return LIFF_URL_BASE + '&ad_namae=' + encodeURIComponent(adNamaeValue);
+  const adNameValue = buildAdName(name);
+  return LIFF_URL_BASE + '&ad_name=' + encodeURIComponent(adNameValue);
 }
 
 async function shortenUrl(longUrl) {
@@ -284,7 +284,7 @@ async function generate() {
   els.generateBtn.textContent = '生成中…';
 
   try {
-    const adNamae = buildAdNamae(name);
+    const adName = buildAdName(name);
     const longUrl = buildLongUrl(name);
     let shortUrl;
     try {
@@ -295,11 +295,11 @@ async function generate() {
     }
 
     state.lastName = name;
-    state.lastAdNamae = adNamae;
+    state.lastAdName = adName;
     state.lastLong = longUrl;
     state.lastShort = shortUrl;
 
-    els.adNamaeBox.textContent = adNamae;
+    els.adNameBox.textContent = adName;
     els.longUrlBox.textContent = longUrl;
     els.shortUrlBox.textContent = shortUrl;
 
@@ -309,7 +309,7 @@ async function generate() {
 
     // Log to sheet (non-blocking errors shown inline)
     els.logStatus.innerHTML = '<span style="color:#666;">スプレッドシートに記録中…</span>';
-    const logRes = await logToSheet({ name, adNamae, longUrl, shortUrl });
+    const logRes = await logToSheet({ name, adName, longUrl, shortUrl });
     if (logRes.ok) {
       els.logStatus.innerHTML = '<span class="badge-ok">✓ スプシに記録しました</span>';
     } else {
