@@ -209,7 +209,7 @@ export async function addVisitor(v: Omit<Visitor, 'id'>): Promise<Visitor> {
 }
 
 /* ===== QR Referral log ===== */
-export type QrReferralRow = { name: string; adNamae: string; longUrl: string; shortUrl: string; };
+export type QrReferralRow = { name: string; adName: string; longUrl: string; shortUrl: string; };
 
 /** QR_SHEET_ID があれば別シートに書き込み、無ければ既定シート (GOOGLE_SHEET_ID) を使用 */
 function qrSheetId(): string {
@@ -231,6 +231,6 @@ export async function addQrReferral(r: QrReferralRow) {
     spreadsheetId: sheetId,
     range: 'QrReferral!A:E',
     valueInputOption: 'RAW',
-    requestBody: { values: [[nowJSTString(), r.name, r.adNamae, r.longUrl, r.shortUrl]] }
+    requestBody: { values: [[nowJSTString(), r.name, r.adName, r.longUrl, r.shortUrl]] }
   });
 }
