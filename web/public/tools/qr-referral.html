@@ -119,8 +119,9 @@ const TEMPLATE_IMG_PATH = './template.png';
 // Fixed QR overlay position (percent of image dimensions). Square: w determines h.
 const QR_POS = { x: 62, y: 73, w: 28, pad: 6 };
 
-// Logging endpoint (Astro API route on same origin)
+// Server endpoints (same-origin Astro API routes)
 const LOG_API = '/api/qr-referral/log';
+const SHORTEN_API = '/api/qr-referral/shorten';
 
 // ===== Elements =====
 const els = {
@@ -160,12 +161,16 @@ function buildLongUrl(name) {
 }
 
 async function shortenUrl(longUrl) {
-  const api = 'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl);
-  const res = await fetch(api);
-  if (!res.ok) throw new Error('TinyURL API: ' + res.status);
-  const text = (await res.text()).trim();
-  if (!text.startsWith('http')) throw new Error('TinyURL応答が不正');
-  return text;
+  const res = await fetch(SHORTEN_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: longUrl }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.shortUrl) {
+    throw new Error(data.error || ('HTTP ' + res.status));
+  }
+  return data.shortUrl;
 }
 
 // ===== QR =====
