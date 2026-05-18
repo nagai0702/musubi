@@ -109,7 +109,8 @@
 
 <script>
 // ===== Fixed config =====
-const LIFF_URL_TEMPLATE = 'https://liff.line.me/2009460950-47mPuMwM/landing?follow=%40595ywnpg&lp=6PsRnk&liff_id=2009460950-47mPuMwM&ad_namae=リファラル_〇〇_none_LP00_000';
+// Base URL: ad_namae パラメータ手前まで。ad_namae の値は別途エンコードして付与する。
+const LIFF_URL_BASE = 'https://liff.line.me/2009460950-47mPuMwM/landing?follow=%40595ywnpg&lp=6PsRnk&liff_id=2009460950-47mPuMwM';
 const AD_NAMAE_TEMPLATE = 'リファラル_〇〇_none_LP00_000';
 
 // Template image path (placed at web/public/tools/template.png → served at /tools/template.png)
@@ -152,7 +153,11 @@ const state = {
 
 // ===== URL construction & shortening =====
 function buildAdNamae(name) { return AD_NAMAE_TEMPLATE.replace('〇〇', name); }
-function buildLongUrl(name) { return LIFF_URL_TEMPLATE.replace('〇〇', encodeURIComponent(name)); }
+// ad_namae の値全体（"リファラル_〇〇_none_LP00_000"）を丸ごとURLエンコードして付与する
+function buildLongUrl(name) {
+  const adNamaeValue = buildAdNamae(name);
+  return LIFF_URL_BASE + '&ad_namae=' + encodeURIComponent(adNamaeValue);
+}
 
 async function shortenUrl(longUrl) {
   const api = 'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl);

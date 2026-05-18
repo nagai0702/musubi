@@ -213,11 +213,20 @@ export type QrReferralRow = { name: string; adNamae: string; longUrl: string; sh
 
 /** QR_SHEET_ID があれば別シートに書き込み、無ければ既定シート (GOOGLE_SHEET_ID) を使用 */
 function qrSheetId(): string {
-  return (import.meta.env.QR_SHEET_ID as string | undefined) || SHEET_ID;
+  const id =
+    (import.meta.env.QR_SHEET_ID as string | undefined) ||
+    (process.env.QR_SHEET_ID as string | undefined) ||
+    SHEET_ID ||
+    (process.env.GOOGLE_SHEET_ID as string | undefined) ||
+    '';
+  return id;
 }
 
 export async function addQrReferral(r: QrReferralRow) {
   const sheetId = qrSheetId();
+  if (!sheetId) {
+    throw new Error('Sheet ID is not configured. Set QR_SHEET_ID or GOOGLE_SHEET_ID env var on Vercel (Preview + Production scope).');
+  }
   await client().spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: 'QrReferral!A:E',
