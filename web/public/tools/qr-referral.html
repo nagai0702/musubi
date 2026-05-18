@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リファラルQR生成ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<style>
+  :root { color-scheme: light; --pink:#ec407a; --pink-d:#c2185b; --bg:#f7f8fa; --border:#e0e0e0; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif; margin:0; background:var(--bg); color:#222; }
+  header { background:#fff; padding:16px 24px; border-bottom:1px solid var(--border); }
+  header h1 { margin:0; font-size:18px; }
+  header .sub { margin-top:4px; font-size:12px; color:#666; }
+  main { max-width:1100px; margin:0 auto; padding:24px; display:grid; grid-template-columns:380px 1fr; gap:24px; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:12px; border:1px solid var(--border); padding:20px; }
+  .card h2 { margin:0 0 12px; font-size:14px; color:#666; font-weight:600; letter-spacing:.04em; }
+  label { display:block; font-size:13px; color:#444; margin:12px 0 4px; }
+  input[type=text], input[type=number] { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+  button { cursor:pointer; border:none; border-radius:8px; padding:10px 16px; font-size:14px; font-weight:600; }
+  button.primary { background:var(--pink); color:#fff; }
+  button.primary:hover { background:var(--pink-d); }
+  button.secondary { background:#f0f0f0; color:#333; }
+  button.secondary:hover { background:#e0e0e0; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .out-section { margin-top:16px; padding-top:16px; border-top:1px dashed var(--border); }
+  .out-label { font-size:12px; color:#888; margin-bottom:6px; }
+  .url-box { background:#f5f5f5; padding:10px 12px; border-radius:6px; font-family:Menlo,Consolas,monospace; font-size:12px; word-break:break-all; }
+  .url-box.short { font-size:14px; font-weight:600; color:var(--pink-d); }
+  .preview-wrap { position:relative; border:1px dashed var(--border); border-radius:8px; overflow:hidden; background:#fafafa; }
+  .preview-wrap canvas { display:block; max-width:100%; height:auto; }
+  .qr-box-overlay { position:absolute; border:2px dashed var(--pink); box-sizing:border-box; pointer-events:none; }
+  .empty-preview { padding:60px 20px; text-align:center; color:#999; font-size:14px; }
+  .help { font-size:11px; color:#888; margin-top:4px; }
+  .qr-mini { display:inline-block; padding:8px; background:#fff; border:1px solid var(--border); border-radius:6px; }
+  .download-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .badge-err { background:#ffebee; color:#c62828; padding:8px 12px; border-radius:6px; font-size:13px; }
+  .badge-warn { background:#fff8e1; color:#8d6e00; padding:8px 12px; border-radius:6px; font-size:13px; }
+  .badge-ok { background:#e8f5e9; color:#2e7d32; padding:8px 12px; border-radius:6px; font-size:13px; }
+  .log-status { margin-top:8px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>リファラルQR生成ツール</h1>
+  <div class="sub">名前を入れると、URL短縮・QR生成・チラシ画像のQR差し替え＋スプシ記録を一括で行います</div>
+</header>
+
+<main>
+  <!-- 入力カラム -->
+  <section class="card">
+    <h2>① 入力</h2>
+
+    <label>担当者名（〇〇に入る部分）</label>
+    <input type="text" id="nameInput" placeholder="例: 山田" autocomplete="off">
+    <div class="help">URLの <code>ad_namae=リファラル_〇〇_none_LP00_000</code> の〇〇に入ります</div>
+
+    <div style="margin-top:14px;">
+      <button class="primary" id="generateBtn" style="width:100%;">生成する</button>
+    </div>
+
+    <div id="errBox" class="badge-err" style="display:none; margin-top:12px;"></div>
+    <div id="warnBox" class="badge-warn" style="display:none; margin-top:12px;"></div>
+
+    <div class="out-section" id="outSection" style="display:none;">
+      <h2 style="margin-top:0;">② 出力</h2>
+
+      <div class="out-label">短縮URL</div>
+      <div class="url-box short" id="shortUrlBox">—</div>
+      <div class="download-row">
+        <button class="secondary" id="copyShortBtn">短縮URLをコピー</button>
+      </div>
+
+      <div class="out-label" style="margin-top:14px;">ad_namae 値</div>
+      <div class="url-box" id="adNamaeBox">—</div>
+
+      <div class="out-label" style="margin-top:14px;">元のURL（エンコード済）</div>
+      <div class="url-box" id="longUrlBox">—</div>
+
+      <div class="out-label" style="margin-top:14px;">QRコード単体</div>
+      <div class="qr-mini"><canvas id="qrCanvas"></canvas></div>
+      <div class="download-row">
+        <button class="secondary" id="downloadQrBtn">QR画像をDL</button>
+      </div>
+
+      <div class="out-label" style="margin-top:14px;">差し替え済みチラシ</div>
+      <div class="download-row">
+        <button class="primary" id="downloadFlyerBtn">チラシ画像をDL</button>
+      </div>
+
+      <div class="log-status" id="logStatus"></div>
+    </div>
+  </section>
+
+  <!-- プレビューカラム -->
+  <section class="card">
+    <h2>プレビュー</h2>
+    <div class="preview-wrap" id="previewWrap">
+      <div class="empty-preview" id="emptyPreview">テンプレ画像を読み込み中…</div>
+      <canvas id="previewCanvas" style="display:none;"></canvas>
+      <div class="qr-box-overlay" id="qrBox" style="display:none;"></div>
+    </div>
+    <div class="help" style="margin-top:8px;">
+      ピンク枠 = 差し替えるQRの位置（固定）
+    </div>
+  </section>
+</main>
+
+<script>
+// ===== Fixed config =====
+const LIFF_URL_TEMPLATE = 'https://liff.line.me/2009460950-47mPuMwM/landing?follow=%40595ywnpg&lp=6PsRnk&liff_id=2009460950-47mPuMwM&ad_namae=リファラル_〇〇_none_LP00_000';
+const AD_NAMAE_TEMPLATE = 'リファラル_〇〇_none_LP00_000';
+
+// Template image path (placed at web/public/tools/template.png → served at /tools/template.png)
+const TEMPLATE_IMG_PATH = './template.png';
+
+// Fixed QR overlay position (percent of image dimensions). Square: w determines h.
+const QR_POS = { x: 62, y: 73, w: 28, pad: 6 };
+
+// Logging endpoint (Astro API route on same origin)
+const LOG_API = '/api/qr-referral/log';
+
+// ===== Elements =====
+const els = {
+  nameInput: document.getElementById('nameInput'),
+  generateBtn: document.getElementById('generateBtn'),
+  outSection: document.getElementById('outSection'),
+  shortUrlBox: document.getElementById('shortUrlBox'),
+  adNamaeBox: document.getElementById('adNamaeBox'),
+  longUrlBox: document.getElementById('longUrlBox'),
+  copyShortBtn: document.getElementById('copyShortBtn'),
+  qrCanvas: document.getElementById('qrCanvas'),
+  downloadQrBtn: document.getElementById('downloadQrBtn'),
+  downloadFlyerBtn: document.getElementById('downloadFlyerBtn'),
+  errBox: document.getElementById('errBox'),
+  warnBox: document.getElementById('warnBox'),
+  logStatus: document.getElementById('logStatus'),
+  previewWrap: document.getElementById('previewWrap'),
+  emptyPreview: document.getElementById('emptyPreview'),
+  previewCanvas: document.getElementById('previewCanvas'),
+  qrBox: document.getElementById('qrBox'),
+};
+
+const state = {
+  templateImg: null,    // HTMLImageElement
+  lastLong: '',
+  lastShort: '',
+  lastName: '',
+  lastAdNamae: '',
+};
+
+// ===== URL construction & shortening =====
+function buildAdNamae(name) { return AD_NAMAE_TEMPLATE.replace('〇〇', name); }
+function buildLongUrl(name) { return LIFF_URL_TEMPLATE.replace('〇〇', encodeURIComponent(name)); }
+
+async function shortenUrl(longUrl) {
+  const api = 'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl);
+  const res = await fetch(api);
+  if (!res.ok) throw new Error('TinyURL API: ' + res.status);
+  const text = (await res.text()).trim();
+  if (!text.startsWith('http')) throw new Error('TinyURL応答が不正');
+  return text;
+}
+
+// ===== QR =====
+function drawQrToCanvas(canvas, text, sizePx) {
+  new QRious({
+    element: canvas, value: text, size: sizePx,
+    background: '#ffffff', foreground: '#000000', level: 'M', padding: 4,
+  });
+}
+
+// ===== Template image =====
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('failed to load image: ' + src));
+    img.src = src;
+  });
+}
+
+async function loadTemplate() {
+  try {
+    state.templateImg = await loadImage(TEMPLATE_IMG_PATH);
+    renderPreview();
+  } catch (e) {
+    els.emptyPreview.innerHTML =
+      'テンプレ画像が見つかりません。<br><code>web/public/tools/template.png</code> に保存してください。';
+    els.emptyPreview.style.color = '#c62828';
+  }
+}
+
+function renderPreview() {
+  if (!state.templateImg) return;
+  els.emptyPreview.style.display = 'none';
+  const img = state.templateImg;
+  const canvas = els.previewCanvas;
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.style.display = 'block';
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  positionQrBox();
+}
+
+function positionQrBox() {
+  if (!state.templateImg) return;
+  const canvas = els.previewCanvas;
+  const rect = canvas.getBoundingClientRect();
+  const wrapRect = els.previewWrap.getBoundingClientRect();
+  const offsetLeft = rect.left - wrapRect.left;
+  const offsetTop = rect.top - wrapRect.top;
+  const scaleX = rect.width / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  const x = (QR_POS.x / 100) * canvas.width;
+  const y = (QR_POS.y / 100) * canvas.height;
+  const w = (QR_POS.w / 100) * canvas.width;
+  els.qrBox.style.display = 'block';
+  els.qrBox.style.left = (offsetLeft + x * scaleX) + 'px';
+  els.qrBox.style.top = (offsetTop + y * scaleY) + 'px';
+  els.qrBox.style.width = (w * scaleX) + 'px';
+  els.qrBox.style.height = (w * scaleY) + 'px';
+}
+
+// ===== Compose final flyer =====
+function composeFlyer(shortUrl) {
+  const img = state.templateImg;
+  const out = document.createElement('canvas');
+  out.width = img.naturalWidth;
+  out.height = img.naturalHeight;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const x = (QR_POS.x / 100) * out.width;
+  const y = (QR_POS.y / 100) * out.height;
+  const w = (QR_POS.w / 100) * out.width;
+  const h = w;
+  const pad = QR_POS.pad;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+  const tmp = document.createElement('canvas');
+  drawQrToCanvas(tmp, shortUrl, Math.max(256, Math.round(w)));
+  ctx.drawImage(tmp, x, y, w, h);
+  return out;
+}
+
+// ===== Sheets logging =====
+async function logToSheet(payload) {
+  try {
+    const res = await fetch(LOG_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || ('HTTP ' + res.status));
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ===== Main generate =====
+async function generate() {
+  els.errBox.style.display = 'none';
+  els.warnBox.style.display = 'none';
+  els.logStatus.innerHTML = '';
+  const name = els.nameInput.value.trim();
+  if (!name) { showErr('担当者名を入力してください'); return; }
+
+  els.generateBtn.disabled = true;
+  els.generateBtn.textContent = '生成中…';
+
+  try {
+    const adNamae = buildAdNamae(name);
+    const longUrl = buildLongUrl(name);
+    let shortUrl;
+    try {
+      shortUrl = await shortenUrl(longUrl);
+    } catch (e) {
+      shortUrl = longUrl;
+      showWarn('URL短縮に失敗したため、元URLでQRを生成します: ' + e.message);
+    }
+
+    state.lastName = name;
+    state.lastAdNamae = adNamae;
+    state.lastLong = longUrl;
+    state.lastShort = shortUrl;
+
+    els.adNamaeBox.textContent = adNamae;
+    els.longUrlBox.textContent = longUrl;
+    els.shortUrlBox.textContent = shortUrl;
+
+    drawQrToCanvas(els.qrCanvas, shortUrl, 280);
+    els.outSection.style.display = 'block';
+    els.downloadFlyerBtn.style.display = state.templateImg ? '' : 'none';
+
+    // Log to sheet (non-blocking errors shown inline)
+    els.logStatus.innerHTML = '<span style="color:#666;">スプレッドシートに記録中…</span>';
+    const logRes = await logToSheet({ name, adNamae, longUrl, shortUrl });
+    if (logRes.ok) {
+      els.logStatus.innerHTML = '<span class="badge-ok">✓ スプシに記録しました</span>';
+    } else {
+      els.logStatus.innerHTML = '<span class="badge-warn">⚠ スプシ記録失敗: ' + escapeHtml(logRes.error) + '</span>';
+    }
+  } catch (e) {
+    showErr('エラー: ' + e.message);
+  } finally {
+    els.generateBtn.disabled = false;
+    els.generateBtn.textContent = '生成する';
+  }
+}
+
+function showErr(msg) { els.errBox.textContent = msg; els.errBox.style.display = 'block'; }
+function showWarn(msg) { els.warnBox.textContent = msg; els.warnBox.style.display = 'block'; }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// ===== Downloads =====
+function safeFileName(name) { return name.replace(/[\\/:*?"<>|]/g, '_'); }
+function triggerDownload(href, filename) {
+  const a = document.createElement('a');
+  a.href = href; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+}
+
+els.downloadQrBtn.addEventListener('click', () => {
+  if (!state.lastName) return;
+  triggerDownload(els.qrCanvas.toDataURL('image/png'), `QR_${safeFileName(state.lastName)}.png`);
+});
+
+els.downloadFlyerBtn.addEventListener('click', () => {
+  if (!state.lastName || !state.lastShort || !state.templateImg) return;
+  const canvas = composeFlyer(state.lastShort);
+  triggerDownload(canvas.toDataURL('image/png'), `チラシ_${safeFileName(state.lastName)}.png`);
+});
+
+els.copyShortBtn.addEventListener('click', async () => {
+  if (!state.lastShort) return;
+  await navigator.clipboard.writeText(state.lastShort);
+  els.copyShortBtn.textContent = 'コピーしました';
+  setTimeout(() => { els.copyShortBtn.textContent = '短縮URLをコピー'; }, 1500);
+});
+
+els.generateBtn.addEventListener('click', generate);
+els.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') generate(); });
+window.addEventListener('resize', positionQrBox);
+
+// ===== Init =====
+loadTemplate();
+</script>
+</body>
+</html>

@@ -207,3 +207,21 @@ export async function addVisitor(v: Omit<Visitor, 'id'>): Promise<Visitor> {
   await append('Visitors!A:I', [id, v.date, v.time, v.name, v.company, v.purpose, v.host, new Date().toISOString(), v.place]);
   return { id, ...v };
 }
+
+/* ===== QR Referral log ===== */
+export type QrReferralRow = { name: string; adNamae: string; longUrl: string; shortUrl: string; };
+
+/** QR_SHEET_ID があれば別シートに書き込み、無ければ既定シート (GOOGLE_SHEET_ID) を使用 */
+function qrSheetId(): string {
+  return (import.meta.env.QR_SHEET_ID as string | undefined) || SHEET_ID;
+}
+
+export async function addQrReferral(r: QrReferralRow) {
+  const sheetId = qrSheetId();
+  await client().spreadsheets.values.append({
+    spreadsheetId: sheetId,
+    range: 'QrReferral!A:E',
+    valueInputOption: 'RAW',
+    requestBody: { values: [[nowJSTString(), r.name, r.adNamae, r.longUrl, r.shortUrl]] }
+  });
+}

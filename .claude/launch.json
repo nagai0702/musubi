@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "gas-app/preview", "-p", "8000", "-c-1"],
       "port": 8000
+    },
+    {
+      "name": "tools-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "web/public/tools", "-p", "8001", "-c-1"],
+      "port": 8001
     }
   ]
 }
