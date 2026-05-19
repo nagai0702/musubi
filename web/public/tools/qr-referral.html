@@ -44,7 +44,6 @@
 <body>
 <header>
   <h1>リファラルQR生成ツール</h1>
-  <div class="sub">名前を入れると、URL短縮・QR生成・チラシ画像のQR差し替え＋スプシ記録を一括で行います</div>
 </header>
 
 <main>
@@ -52,9 +51,8 @@
   <section class="card">
     <h2>① 入力</h2>
 
-    <label>担当者名（〇〇に入る部分）</label>
-    <input type="text" id="nameInput" placeholder="例: 山田" autocomplete="off">
-    <div class="help">URLの <code>ad_name=リファラル_〇〇_none_LP00_000</code> の〇〇に入ります</div>
+    <label>紹介者名（フルネームもしくは会社名）</label>
+    <input type="text" id="nameInput" placeholder="例: 山田太郎" autocomplete="off">
 
     <div style="margin-top:14px;">
       <button class="primary" id="generateBtn" style="width:100%;">生成する</button>
@@ -72,11 +70,11 @@
         <button class="secondary" id="copyShortBtn">短縮URLをコピー</button>
       </div>
 
-      <div class="out-label" style="margin-top:14px;">ad_name 値</div>
-      <div class="url-box" id="adNameBox">—</div>
+      <div class="out-label" style="display:none; margin-top:14px;">ad_name 値</div>
+      <div class="url-box" id="adNameBox" style="display:none;">—</div>
 
-      <div class="out-label" style="margin-top:14px;">元のURL（エンコード済）</div>
-      <div class="url-box" id="longUrlBox">—</div>
+      <div class="out-label" style="display:none; margin-top:14px;">元のURL（エンコード済）</div>
+      <div class="url-box" id="longUrlBox" style="display:none;">—</div>
 
       <div class="out-label" style="margin-top:14px;">QRコード単体</div>
       <div class="qr-mini"><canvas id="qrCanvas"></canvas></div>
@@ -117,7 +115,7 @@ const AD_NAME_TEMPLATE = 'リファラル_〇〇_none_LP00_000';
 const TEMPLATE_IMG_PATH = './template.png';
 
 // Fixed QR overlay position (percent of image dimensions). Square: w determines h.
-const QR_POS = { x: 62, y: 73, w: 28, pad: 6 };
+const QR_POS = { x: 60, y: 83, w: 28, pad: 4 };
 
 // Server endpoints (same-origin Astro API routes)
 const LOG_API = '/api/qr-referral/log';
@@ -307,14 +305,8 @@ async function generate() {
     els.outSection.style.display = 'block';
     els.downloadFlyerBtn.style.display = state.templateImg ? '' : 'none';
 
-    // Log to sheet (non-blocking errors shown inline)
-    els.logStatus.innerHTML = '<span style="color:#666;">スプレッドシートに記録中…</span>';
-    const logRes = await logToSheet({ name, adName, longUrl, shortUrl });
-    if (logRes.ok) {
-      els.logStatus.innerHTML = '<span class="badge-ok">✓ スプシに記録しました</span>';
-    } else {
-      els.logStatus.innerHTML = '<span class="badge-warn">⚠ スプシ記録失敗: ' + escapeHtml(logRes.error) + '</span>';
-    }
+    // Log to sheet silently in the background (no UI status shown)
+    logToSheet({ name, adName, longUrl, shortUrl }).catch(() => { /* swallow */ });
   } catch (e) {
     showErr('エラー: ' + e.message);
   } finally {
