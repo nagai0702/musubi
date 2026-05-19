@@ -305,14 +305,8 @@ async function generate() {
     els.outSection.style.display = 'block';
     els.downloadFlyerBtn.style.display = state.templateImg ? '' : 'none';
 
-    // Log to sheet (non-blocking errors shown inline)
-    els.logStatus.innerHTML = '<span style="color:#666;">スプレッドシートに記録中…</span>';
-    const logRes = await logToSheet({ name, adName, longUrl, shortUrl });
-    if (logRes.ok) {
-      els.logStatus.innerHTML = '<span class="badge-ok">✓ スプシに記録しました</span>';
-    } else {
-      els.logStatus.innerHTML = '<span class="badge-warn">⚠ スプシ記録失敗: ' + escapeHtml(logRes.error) + '</span>';
-    }
+    // Log to sheet silently in the background (no UI status shown)
+    logToSheet({ name, adName, longUrl, shortUrl }).catch(() => { /* swallow */ });
   } catch (e) {
     showErr('エラー: ' + e.message);
   } finally {
