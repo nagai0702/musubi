@@ -136,12 +136,6 @@ export const GET: APIRoute = async ({ request }) => {
     }
   } catch (e: any) {
     results.push(`tasks-check: error - ${e.message}`);
-    try {
-      await hisyoSlackAPI('chat.postMessage', {
-        channel: import.meta.env.SLACK_DIGEST_CHANNEL_ID,
-        text: `タスク抽出エラー (daily cron): ${e.message}\n${(e.stack || '').slice(0, 500)}`,
-      });
-    } catch {}
   }
 
   return new Response(JSON.stringify({ processed: results.length, details: results }), {

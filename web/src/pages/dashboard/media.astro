@@ -1,0 +1,77 @@
+---
+export const prerender = false;
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { getMediaSummary } from '../../lib/dashboard/media';
+
+let media, error;
+try {
+  media = await getMediaSummary();
+} catch (e: any) {
+  error = e.message || String(e);
+}
+
+const yen = (n: number) => n ? '¥' + Math.round(n).toLocaleString('ja-JP') : '-';
+const num = (n: number) => n ? Math.round(n).toLocaleString('ja-JP') : '-';
+const pct = (n: number | null) => n == null ? '-' : `${n.toFixed(2)}%`;
+---
+<DashboardLayout title="媒体別 流入" active="media" fetchedAt={media?.fetchedAt}>
+  {error && <div class="section"><strong style="color:var(--red)">エラー:</strong> {error}</div>}
+
+  {media?.total && (
+    <div class="tiles">
+      <div class="tile"><div class="label">広告費 (累計)</div><div class="value">{yen(media.total.ad_cost_with_fee)}</div></div>
+      <div class="tile"><div class="label">LINE登録 (累計)</div><div class="value">{num(media.total.line_register)}</div><div class="sub">登録CPA {yen(media.total.reg_cpa)}</div></div>
+      <div class="tile"><div class="label">予約 (累計)</div><div class="value">{num(media.total.reservation_total)}</div><div class="sub">予約率 {pct(media.total.reservation_rate)}</div></div>
+      <div class="tile"><div class="label">対象内予約 (累計)</div><div class="value">{num(media.total.in_scope_reservation)}</div><div class="sub">対象内率 {pct(media.total.in_scope_rate)}</div></div>
+    </div>
+  )}
+
+  {media && (
+    <div class="section">
+      <h3>月別 媒体パフォーマンス</h3>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>月</th>
+              <th>広告費</th>
+              <th>imp</th>
+              <th>CPM</th>
+              <th>Click</th>
+              <th>CTR</th>
+              <th>CPC</th>
+              <th>LINE登録</th>
+              <th>登録CPA</th>
+              <th>予約</th>
+              <th>予約率</th>
+              <th>予約CPA</th>
+              <th>対象内率</th>
+              <th>対象内予約</th>
+            </tr>
+          </thead>
+          <tbody>
+            {media.months.map(m => (
+              <tr>
+                <td class="text">{m.month}</td>
+                <td>{yen(m.ad_cost_with_fee)}</td>
+                <td>{num(m.imp)}</td>
+                <td>{yen(m.cpm)}</td>
+                <td>{num(m.clicks)}</td>
+                <td class="dim">{pct(m.ctr)}</td>
+                <td>{yen(m.cpc)}</td>
+                <td class="bold">{num(m.line_register)}</td>
+                <td>{yen(m.reg_cpa)}</td>
+                <td class="bold">{num(m.reservation_total)}</td>
+                <td class="dim">{pct(m.reservation_rate)}</td>
+                <td>{yen(m.reservation_cpa)}</td>
+                <td class="dim">{pct(m.in_scope_rate)}</td>
+                <td class="bold">{num(m.in_scope_reservation)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--text-muted);font-size:11px;margin-top:8px">※ 元シート「【ML】トランザクション表示用 / 表示用＿広告サマリ」(YouTube流入除外済み)</p>
+    </div>
+  )}
+</DashboardLayout>

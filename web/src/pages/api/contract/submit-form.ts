@@ -5,7 +5,9 @@ export const POST: APIRoute = async ({ request }) => {
   const body = await request.json();
   const { token, email, name, nameKana, phone, birthday, postalCode, address, coolingOffAgreed, notesAgreed } = body;
 
-  if (!token) return new Response(JSON.stringify({ error: 'トークンが必要です' }), { status: 400 });
+  if (!token || !email || !name || !phone || !birthday || !postalCode || !address) {
+    return new Response(JSON.stringify({ error: '必須項目が不足しています' }), { status: 400 });
+  }
 
   const found = await getByToken(token);
   if (!found) return new Response(JSON.stringify({ error: '契約が見つかりません' }), { status: 404 });

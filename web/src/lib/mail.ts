@@ -40,8 +40,9 @@ export async function sendMail(opts: SendMailOptions) {
   if (opts.attachments) {
     for (const att of opts.attachments) {
       raw += `--${boundary}\r\n`;
-      raw += `Content-Type: ${att.mimeType}; name="${att.filename}"\r\n`;
-      raw += `Content-Disposition: attachment; filename="${att.filename}"\r\n`;
+      const encodedFilename = `=?UTF-8?B?${Buffer.from(att.filename).toString('base64')}?=`;
+      raw += `Content-Type: ${att.mimeType}; name="${encodedFilename}"\r\n`;
+      raw += `Content-Disposition: attachment; filename="${encodedFilename}"\r\n`;
       raw += `Content-Transfer-Encoding: base64\r\n\r\n`;
       raw += att.data.toString('base64') + '\r\n';
     }

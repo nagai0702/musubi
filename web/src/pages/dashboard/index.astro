@@ -1,0 +1,137 @@
+---
+export const prerender = false;
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { getPL, pickItem, currentMonthIndex } from '../../lib/dashboard/pl';
+import { getUnpaid } from '../../lib/dashboard/unpaid';
+
+let pl, unpaid, error;
+try {
+  [pl, unpaid] = await Promise.all([getPL(), getUnpaid()]);
+} catch (e: any) {
+  error = e.message || String(e);
+}
+
+const yen = (n: number) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const pct = (n: number | null) => n == null ? '-' : `${n.toFixed(1)}%`;
+const ratioClass = (n: number | null) => n == null ? '' : n >= 100 ? 'pos' : n >= 80 ? '' : 'neg';
+
+let curIdx = 0;
+let curMonth = '';
+let totalRow: ReturnType<typeof pickItem> | undefined;
+let opItem: ReturnType<typeof pickItem> | undefined;
+let initialItem: ReturnType<typeof pickItem> | undefined;
+let subscItem: ReturnType<typeof pickItem> | undefined;
+let orderCount: ReturnType<typeof pickItem> | undefined;
+let adCost: ReturnType<typeof pickItem> | undefined;
+
+if (pl) {
+  curIdx = currentMonthIndex(pl.months);
+  curMonth = pl.months[curIdx] || '';
+  totalRow = pickItem(pl, '売上');
+  opItem = pickItem(pl, '営業利益');
+  initialItem = pickItem(pl, '初期利益');
+  subscItem = pickItem(pl, 'サブスク利益');
+  orderCount = pickItem(pl, '成約数');
+  adCost = pickItem(pl, '広告費用');
+}
+
+const cur = (item: ReturnType<typeof pickItem> | undefined) =>
+  item?.months[curIdx] || { target: 0, actual: 0, achievement: null };
+---
+<DashboardLayout title="PL / 概況" active="overview" fetchedAt={pl?.fetchedAt}>
+  {error && <div class="section"><strong style="color:var(--red)">エラー:</strong> {error}</div>}
+
+  {pl && (
+    <>
+      <div class="tiles">
+        <div class="tile">
+          <div class="label">{curMonth} 売上 (実数)</div>
+          <div class="value">{yen(cur(totalRow).actual)}</div>
+          <div class="sub">目標 {yen(cur(totalRow).target)} / 達成 <span class={ratioClass(cur(totalRow).achievement)}>{pct(cur(totalRow).achievement)}</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">{curMonth} 営業利益</div>
+          <div class="value" style={cur(opItem).actual >= 0 ? '' : 'color:var(--red)'}>{yen(cur(opItem).actual)}</div>
+          <div class="sub">目標 {yen(cur(opItem).target)} / 達成 <span class={ratioClass(cur(opItem).achievement)}>{pct(cur(opItem).achievement)}</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">{curMonth} 成約数</div>
+          <div class="value">{cur(orderCount).actual.toFixed(0)}<span style="font-size:14px;color:var(--text-dim)"> / {cur(orderCount).target.toFixed(0)}</span></div>
+          <div class="sub">達成 <span class={ratioClass(cur(orderCount).achievement)}>{pct(cur(orderCount).achievement)}</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">{curMonth} 広告費用</div>
+          <div class="value">{yen(cur(adCost).actual)}</div>
+          <div class="sub">予算 {yen(cur(adCost).target)} ({pct(cur(adCost).achievement)} 消化)</div>
+        </div>
+        {unpaid && (
+          <div class="tile bad">
+            <div class="label">未入金 残高</div>
+            <div class="value">{yen(unpaid.totalAmount)}</div>
+            <div class="sub">{unpaid.totalCount} 件 (詳細→)</div>
+          </div>
+        )}
+      </div>
+
+      <div class="section">
+        <h3>月次PL ({pl.months[0]} 〜 {pl.months[pl.months.length - 1]})</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                {pl.months.map(m => (<>
+                  <th>{m.replace('2026年', '').replace('2027年', '↑')} 目標</th>
+                  <th>実数</th>
+                  <th>達成</th>
+                </>))}
+              </tr>
+            </thead>
+            <tbody>
+              {pl.items.filter(it => it.level === 0).map(it => (
+                <tr>
+                  <td class={`text bold`}>{it.name.trim()}</td>
+                  {it.months.map(m => (<>
+                    <td class="dim">{m.target ? yen(m.target) : '-'}</td>
+                    <td class="bold">{m.actual ? yen(m.actual) : '-'}</td>
+                    <td class={ratioClass(m.achievement)}>{pct(m.achievement)}</td>
+                  </>))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>内訳（成約・原価・広告費）</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                {pl.months.slice(Math.max(0, curIdx - 2), curIdx + 1).map(m => (<>
+                  <th>{m.replace('2026年','').replace('2027年','↑')} 目標</th>
+                  <th>実数</th>
+                  <th>達成</th>
+                </>))}
+              </tr>
+            </thead>
+            <tbody>
+              {pl.items.filter(it => it.level >= 1).map(it => (
+                <tr>
+                  <td class={`text indent-${it.level}`}>{it.name.trim().replace(/^[┣]/, '')}</td>
+                  {it.months.slice(Math.max(0, curIdx - 2), curIdx + 1).map(m => (<>
+                    <td class="dim">{m.target ? yen(m.target) : '-'}</td>
+                    <td>{m.actual ? yen(m.actual) : '-'}</td>
+                    <td class={ratioClass(m.achievement)}>{pct(m.achievement)}</td>
+                  </>))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )}
+</DashboardLayout>

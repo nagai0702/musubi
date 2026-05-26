@@ -1,0 +1,131 @@
+---
+export const prerender = false;
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { getFunnel, getIncomeAnalysis } from '../../lib/dashboard/sales';
+
+let funnel, income, error;
+try {
+  [funnel, income] = await Promise.all([getFunnel(), getIncomeAnalysis()]);
+} catch (e: any) {
+  error = e.message || String(e);
+}
+
+const yen = (n: number) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const num = (n: number) => Math.round(n).toLocaleString('ja-JP');
+const pct = (n: number | null) => n == null ? '-' : `${(n * 100).toFixed(1)}%`;
+const pctRaw = (n: number) => `${n.toFixed(1)}%`;
+const safeRatio = (a: number, b: number) => b > 0 ? (a / b) * 100 : null;
+---
+<DashboardLayout title="営業ファネル" active="sales" fetchedAt={funnel?.fetchedAt}>
+  {error && <div class="section"><strong style="color:var(--red)">エラー:</strong> {error}</div>}
+
+  {funnel && (
+    <>
+      <div class="section">
+        <h3>{funnel.month} 月間ファネル累計</h3>
+        <div class="funnel">
+          <div class="step">
+            <div class="label">広告費</div>
+            <div class="actual">{yen(funnel.totals.ad_cost_actual)}</div>
+            <div class="plan">計画 {yen(funnel.totals.ad_cost_plan)}</div>
+            <div class="rate">{pctRaw(safeRatio(funnel.totals.ad_cost_actual, funnel.totals.ad_cost_plan) ?? 0)} 消化</div>
+          </div>
+          <div class="step">
+            <div class="label">LINE登録</div>
+            <div class="actual">{num(funnel.totals.line_register_actual)}</div>
+            <div class="plan">計画 {num(funnel.totals.line_register_plan)}</div>
+            <div class="rate">登録CPA {funnel.totals.line_register_actual > 0 ? yen(funnel.totals.ad_cost_actual / funnel.totals.line_register_actual) : '-'}</div>
+          </div>
+          <div class="step">
+            <div class="label">対象内予約</div>
+            <div class="actual">{num(funnel.totals.reservation_actual)}</div>
+            <div class="plan">計画 {num(funnel.totals.reservation_plan)}</div>
+            <div class="rate">予約率 {pct(funnel.rates.line_to_reservation)}</div>
+          </div>
+          <div class="step">
+            <div class="label">着座</div>
+            <div class="actual">{num(funnel.totals.seat_actual)}</div>
+            <div class="plan">計画 {num(funnel.totals.seat_plan)}</div>
+            <div class="rate">着座率 {pct(funnel.rates.reservation_to_seat)}</div>
+          </div>
+          <div class="step">
+            <div class="label">成約</div>
+            <div class="actual">{num(funnel.totals.order_actual)}</div>
+            <div class="plan">計画 {num(funnel.totals.order_plan)}</div>
+            <div class="rate">成約率 {pct(funnel.rates.seat_to_order)}</div>
+          </div>
+        </div>
+        <div class="tiles" style="grid-template-columns:repeat(4,1fr)">
+          <div class="tile"><div class="label">登録→予約</div><div class="value">{pct(funnel.rates.line_to_reservation)}</div></div>
+          <div class="tile"><div class="label">予約→着座</div><div class="value">{pct(funnel.rates.reservation_to_seat)}</div></div>
+          <div class="tile"><div class="label">着座→成約</div><div class="value">{pct(funnel.rates.seat_to_order)}</div></div>
+          <div class="tile"><div class="label">登録→成約</div><div class="value">{pct(funnel.rates.line_to_order)}</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>日次推移 (実績)</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>広告費</th>
+                <th>LINE登録</th>
+                <th>対象内予約</th>
+                <th>着座</th>
+                <th>成約</th>
+                <th>登録→予約</th>
+                <th>予約→着座</th>
+                <th>着座→成約</th>
+              </tr>
+            </thead>
+            <tbody>
+              {funnel.days.map(d => (
+                <tr>
+                  <td class="text">{d.date.slice(5)}</td>
+                  <td>{d.ad_cost_actual ? yen(d.ad_cost_actual) : '-'}</td>
+                  <td>{d.line_register_actual || '-'}</td>
+                  <td>{d.reservation_actual || '-'}</td>
+                  <td>{d.seat_actual || '-'}</td>
+                  <td>{d.order_actual || '-'}</td>
+                  <td class="dim">{d.line_register_actual ? pctRaw((d.reservation_actual / d.line_register_actual) * 100) : '-'}</td>
+                  <td class="dim">{d.reservation_actual ? pctRaw((d.seat_actual / d.reservation_actual) * 100) : '-'}</td>
+                  <td class="dim">{d.seat_actual ? pctRaw((d.order_actual / d.seat_actual) * 100) : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )}
+
+  {income && (
+    <div class="section">
+      <h3>年収帯別 予約 / 着座 / 受注 構成 (直近6ヶ月累計)</h3>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>年収帯</th>
+              <th>予約構成</th>
+              <th>着座構成</th>
+              <th>受注構成</th>
+            </tr>
+          </thead>
+          <tbody>
+            {income.totalRecent.map(b => (
+              <tr>
+                <td class="text">{b.label}</td>
+                <td><span class="bar"><span style={`width:${Math.min(b.reservation, 100)}%`}></span></span>{pctRaw(b.reservation)}</td>
+                <td><span class="bar"><span style={`width:${Math.min(b.seat, 100)}%`}></span></span>{pctRaw(b.seat)}</td>
+                <td><span class="bar"><span style={`width:${Math.min(b.order, 100)}%`}></span></span>{pctRaw(b.order)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+</DashboardLayout>

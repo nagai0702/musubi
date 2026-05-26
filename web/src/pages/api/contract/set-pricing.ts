@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro';
 import { getSession } from '../../../lib/session';
 import { getByToken, updateContract } from '../../../lib/contracts';
 import type { PaymentMethod } from '../../../lib/contracts';
-import { writeCustomerData, writeSalesData } from '../../../lib/contract-sheet';
+import { writeCustomerData, writeSalesData, exportSingleSheetPdf } from '../../../lib/contract-sheet';
+import { setPdfCache, cacheKey } from '../../../lib/pdf-cache';
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const user = getSession(cookies);
@@ -13,7 +14,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     token, paymentMethod,
     contractStartDate, activityStartDate, plan,
     initialPaymentMethod, upfrontPayment, paymentInstallments,
-    monthlyPaymentMethod, contractPeriod,
+    monthlyPaymentMethod, monthlyPaymentDay, monthlyPaymentType, contractPeriod,
+    initialCost, marriageFee,
   } = body;
 
   if (!token || !paymentMethod || !plan) {
@@ -38,7 +40,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       name: c.name,
       email: c.email,
       phone: c.phone,
-      address: `${c.postalCode} ${c.address}`,
+      address: c.address,
       birthday,
     });
 
@@ -52,7 +54,11 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       upfrontPayment: upfrontPayment || '¥0',
       paymentInstallments: paymentInstallments || '',
       monthlyPaymentMethod: monthlyPaymentMethod || 'クレジットカード',
+      monthlyPaymentDay: monthlyPaymentDay || '毎月28日',
+      monthlyPaymentType: monthlyPaymentType || '分割払い（割賦販売契約）',
       contractPeriod: contractPeriod || '12か月',
+      initialCost: initialCost || '',
+      marriageFee: marriageFee || '¥220,000',
     });
 
     // 3. Contractsシートを更新（テンプレートシートIDを保存）
@@ -62,6 +68,24 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       paymentMethod: paymentMethod as PaymentMethod,
       pdfUrl: templateSheetId,
     });
+
+    // 4. PDF事前生成・キャッシュ（バックグラウンド、レスポンスをブロックしない）
+    (async () => {
+      try {
+        const sheetNames = [
+          '恋愛婚活相談サービス利用申込契約書',
+          '恋愛婚活相談サービス概要書面',
+          'サービス利用料金',
+        ];
+        for (let i = 0; i < sheetNames.length; i++) {
+          const buf = await exportSingleSheetPdf(templateSheetId, sheetNames[i]);
+          setPdfCache(cacheKey(token, i), buf);
+        }
+        console.log('[contract] PDF cache generated for', token);
+      } catch (e) {
+        console.error('[contract] PDF cache error:', e);
+      }
+    })();
 
     return new Response(JSON.stringify({ ok: true, sheetId: templateSheetId }), {
       status: 200,

@@ -1,0 +1,100 @@
+---
+import { getSession } from '@/lib/session';
+import * as members from '@/lib/crm/members';
+
+export const prerender = false;
+
+const user = getSession(Astro.cookies);
+const list = user ? await members.listActive() : [];
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daysAgo(iso: string | null): string {
+  if (!iso) return '—';
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return `${days}日前`;
+}
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>結びCRM - 会員一覧</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
+    .header { background: #fff; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .user { font-size: 14px; color: #666; }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .search { margin-bottom: 16px; }
+    .search input { width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
+    .empty { text-align: center; padding: 60px 20px; color: #94a3b8; }
+    table { width: 100%; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-collapse: collapse; }
+    th, td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+    th { background: #f8fafc; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #f8fafc; }
+    a.name-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    a.name-link:hover { text-decoration: underline; }
+    .status { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .status-活動中 { background: #d1fae5; color: #065f46; }
+    .status-交際中 { background: #fce7f3; color: #9d174d; }
+    .silent-warn { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>結び CRM - 活動中会員</h1>
+    <span class="user">{user?.name || ''}</span>
+  </div>
+
+  {!user ? (
+    <div class="empty">
+      <p style="margin-bottom: 16px;">社内アカウントでログインしてください</p>
+      <a href="/api/auth/slack/login">Slackでログイン</a>
+    </div>
+  ) : (
+    <div class="container">
+      <div class="search">
+        <input id="q" type="text" placeholder="氏名・会員IDで絞り込み" />
+      </div>
+      {list.length === 0 ? (
+        <div class="empty">活動中の会員がいません</div>
+      ) : (
+        <table id="tbl">
+          <thead>
+            <tr><th>氏名</th><th>会員ID</th><th>ステータス</th><th>年齢</th><th>最終LINE返信</th></tr>
+          </thead>
+          <tbody>
+            {list.map((m: any) => (
+              <tr data-q={`${m.name} ${m.memberId} ${m.federationId}`.toLowerCase()}>
+                <td><a class="name-link" href={`/crm/member/${encodeURIComponent(m.memberId || m.pageId)}`}>{m.name}</a></td>
+                <td>{m.memberId || '—'}</td>
+                <td>{m.status ? <span class={`status status-${m.status}`}>{m.status}</span> : '—'}</td>
+                <td>{m.age ?? '—'}</td>
+                <td class={m.lastReplyAt && (Date.now() - new Date(m.lastReplyAt).getTime()) > 7 * 86400000 ? 'silent-warn' : ''}>{daysAgo(m.lastReplyAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )}
+  <script>
+    const q = document.getElementById('q');
+    q?.addEventListener('input', () => {
+      const v = q.value.trim().toLowerCase();
+      for (const row of document.querySelectorAll('#tbl tbody tr')) {
+        row.style.display = !v || (row.dataset.q || '').includes(v) ? '' : 'none';
+      }
+    });
+  </script>
+</body>
+</html>

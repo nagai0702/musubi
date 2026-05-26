@@ -1,0 +1,133 @@
+---
+export const prerender = false;
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { getUnpaid } from '../../lib/dashboard/unpaid';
+
+let data, error;
+try {
+  data = await getUnpaid();
+} catch (e: any) {
+  error = e.message || String(e);
+}
+
+const yen = (n: number) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const num = (n: number) => Math.round(n).toLocaleString('ja-JP');
+const pct = (n: number | null) => n == null ? '-' : `${n.toFixed(0)}%`;
+
+const statusGroups: Record<string, number> = {};
+const subjectGroups: Record<string, number> = {};
+if (data) {
+  for (const e of data.list) {
+    statusGroups[e.status || '(未分類)'] = (statusGroups[e.status || '(未分類)'] || 0) + e.amount;
+    subjectGroups[e.subject || '(未分類)'] = (subjectGroups[e.subject || '(未分類)'] || 0) + e.amount;
+  }
+}
+---
+<DashboardLayout title="未入金 回収状況" active="unpaid" fetchedAt={data?.fetchedAt}>
+  {error && <div class="section"><strong style="color:var(--red)">エラー:</strong> {error}</div>}
+
+  {data && (
+    <>
+      <div class="tiles">
+        <div class="tile bad">
+          <div class="label">未入金 残高 (合計)</div>
+          <div class="value">{yen(data.totalAmount)}</div>
+          <div class="sub">{data.totalCount} 件</div>
+        </div>
+        {Object.entries(statusGroups).slice(0, 4).map(([status, amount]) => (
+          <div class="tile">
+            <div class="label">{status}</div>
+            <div class="value">{yen(amount)}</div>
+            <div class="sub">{data.list.filter(e => e.status === status).length} 件</div>
+          </div>
+        ))}
+      </div>
+
+      <div class="section">
+        <h3>科目別 残高内訳</h3>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>科目</th><th>件数</th><th>金額</th></tr></thead>
+            <tbody>
+              {Object.entries(subjectGroups).sort((a, b) => b[1] - a[1]).map(([s, amt]) => (
+                <tr>
+                  <td class="text">{s}</td>
+                  <td>{data.list.filter(e => e.subject === s).length}</td>
+                  <td class="bold">{yen(amt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>月次 未入金 / 回収率推移</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>月</th>
+                <th>件数</th>
+                <th>未入金額</th>
+                <th>回収件数</th>
+                <th>回収済額</th>
+                <th>未回収件数</th>
+                <th>未回収額</th>
+                <th>回収率(件)</th>
+                <th>回収率(額)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.monthly.map(m => (
+                <tr>
+                  <td class="text">{m.month}</td>
+                  <td>{num(m.count)}</td>
+                  <td>{yen(m.amount)}</td>
+                  <td class="pos">{num(m.recoveredCount)}</td>
+                  <td class="pos">{yen(m.recoveredAmount)}</td>
+                  <td class="dim">{num(m.pendingCount)}</td>
+                  <td class={m.pendingAmount > 100000 ? 'neg' : 'dim'}>{yen(m.pendingAmount)}</td>
+                  <td class={(m.recoveryRateCount ?? 0) >= 90 ? 'pos' : (m.recoveryRateCount ?? 0) >= 80 ? '' : 'warn'}>{pct(m.recoveryRateCount)}</td>
+                  <td class={(m.recoveryRateAmount ?? 0) >= 90 ? 'pos' : (m.recoveryRateAmount ?? 0) >= 80 ? '' : 'warn'}>{pct(m.recoveryRateAmount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>未入金 一覧 ({data.list.length} 件)</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>取引日</th>
+                <th>顧客名</th>
+                <th>科目</th>
+                <th>金額</th>
+                <th>支払方法</th>
+                <th>ステータス</th>
+                <th>メモ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.list.slice().sort((a, b) => a.date.localeCompare(b.date)).map(e => (
+                <tr>
+                  <td class="text">{e.date}</td>
+                  <td class="text">{e.customerName}</td>
+                  <td class="text dim">{e.subject}</td>
+                  <td class="bold">{yen(e.amount)}</td>
+                  <td class="dim">{e.payMethod}</td>
+                  <td>{e.status && <span class="pill">{e.status}</span>}</td>
+                  <td class="text dim" style="white-space:normal;max-width:300px">{e.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )}
+</DashboardLayout>

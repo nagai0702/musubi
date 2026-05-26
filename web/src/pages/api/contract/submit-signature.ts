@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { getByToken, updateContract } from '../../../lib/contracts';
 import { exportSingleSheetPdf } from '../../../lib/contract-sheet';
 import { sendContractEmail } from '../../../lib/mail';
+import { addStampToPdf } from '../../../lib/stamp-pdf';
 
 export const POST: APIRoute = async ({ request }) => {
   const body = await request.json();
@@ -28,16 +29,24 @@ export const POST: APIRoute = async ({ request }) => {
   const spreadsheetId = found.contract.pdfUrl;
   if (spreadsheetId && found.contract.email) {
     const sheetNames = [
-      { name: '恋愛婚活相談サービス利用申込契約書', label: '利用申込契約書' },
-      { name: '恋愛婚活相談サービス概要書面', label: 'サービス概要書面' },
-      { name: 'サービス利用料金', label: 'サービス利用料金' },
+      { name: '恋愛婚活相談サービス利用申込契約書', label: '利用申込契約書', stamp: true },
+      { name: '恋愛婚活相談サービス概要書面', label: 'サービス概要書面', stamp: true },
+      { name: 'サービス利用料金', label: 'サービス利用料金', stamp: false },
     ];
     // 非同期でメール送信（レスポンスをブロックしない）
     (async () => {
       try {
         const pdfBuffers = [];
         for (const s of sheetNames) {
-          const buf = await exportSingleSheetPdf(spreadsheetId, s.name);
+          let buf = await exportSingleSheetPdf(spreadsheetId, s.name);
+          // 契約書と概要書面に押印画像を重ねる
+          if (signatureData && signatureData.startsWith('data:image/png') && s.stamp) {
+            try {
+              buf = await addStampToPdf(buf, signatureData);
+            } catch (e) {
+              console.error(`[contract] 押印重ね失敗(${s.label}):`, e);
+            }
+          }
           pdfBuffers.push({ filename: `${found.contract.name}_${s.label}.pdf`, data: buf });
         }
         await sendContractEmail(found.contract.email, found.contract.name, pdfBuffers);

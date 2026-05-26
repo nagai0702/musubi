@@ -1,0 +1,48 @@
+---
+interface Props {
+  title: string;
+  active: 'overview' | 'sales' | 'media' | 'members' | 'unpaid';
+  fetchedAt?: string;
+}
+const { title, active, fetchedAt } = Astro.props;
+
+const fetchedJST = fetchedAt
+  ? new Date(new Date(fetchedAt).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ') + ' JST'
+  : '';
+
+const nav = [
+  { id: 'overview', label: 'PL / 概況', href: '/dashboard' },
+  { id: 'sales', label: '営業ファネル', href: '/dashboard/sales' },
+  { id: 'media', label: '媒体別流入', href: '/dashboard/media' },
+  { id: 'members', label: '会員ステータス', href: '/dashboard/members' },
+  { id: 'unpaid', label: '未入金回収', href: '/dashboard/unpaid' },
+];
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} | 結び経営ダッシュボード</title>
+  <link rel="stylesheet" href="/dashboard.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <h1>結び経営DB<small>Musubi Dashboard</small></h1>
+      <nav>
+        {nav.map(n => (
+          <a href={n.href} class={n.id === active ? 'active' : ''}>{n.label}</a>
+        ))}
+      </nav>
+    </aside>
+    <main class="main">
+      <header>
+        <h2>{title}</h2>
+        <div class="meta">{fetchedJST && `更新: ${fetchedJST}`}</div>
+      </header>
+      <slot />
+    </main>
+  </div>
+</body>
+</html>

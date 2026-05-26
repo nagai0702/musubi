@@ -9,192 +9,315 @@ const alreadyFilled = contract && contract.status !== 'draft';
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ご契約情報入力 - 結び</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
-    .header { background: #fff; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; text-align: center; }
-    .header h1 { font-size: 20px; font-weight: 600; }
-    .header p { font-size: 13px; color: #666; margin-top: 4px; }
-    .container { max-width: 540px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
-    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
-    .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
-    .field label .req { color: #ef4444; font-size: 11px; margin-left: 4px; }
-    .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; }
-    .field input:focus, .field select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .check-field { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; }
-    .check-field input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
-    .check-field span { font-size: 13px; line-height: 1.5; }
-    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-    .done { text-align: center; padding: 60px 20px; }
-    .done h2 { font-size: 20px; margin-bottom: 12px; color: #059669; }
-    .error { display: none; padding: 12px; background: #fef2f2; color: #b91c1c; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
-    .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  <link rel="stylesheet" href="/contract.css">
 </head>
 <body>
-  <div class="header">
-    <h1>株式会社結び</h1>
-    <p>ご契約情報入力フォーム</p>
+
+  <div class="c-header">
+    <div class="c-header__inner">
+      <div>
+        <div class="c-header__brand">株式会社結び</div>
+        <div class="c-header__sub">ご契約情報入力</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="c-steps">
+    <div class="c-steps__inner">
+      <div class="c-step active"><span class="c-step__num">1</span><span class="c-step__label">入力</span></div>
+      <div class="c-step"><span class="c-step__num">2</span><span class="c-step__label">確認・押印</span></div>
+      <div class="c-step"><span class="c-step__num">3</span><span class="c-step__label">決済</span></div>
+      <div class="c-step"><span class="c-step__num">4</span><span class="c-step__label">完了</span></div>
+    </div>
   </div>
 
   {!contract ? (
-    <div class="container">
-      <div class="done">
-        <h2>無効なリンク</h2>
-        <p>このURLは無効です。担当者にお問い合わせください。</p>
+    <div class="c-container">
+      <div class="c-done">
+        <div class="c-done__icon">!</div>
+        <div class="c-done__title">無効なリンク</div>
+        <p class="c-done__text">このURLは無効です。<br>担当者にお問い合わせください。</p>
       </div>
     </div>
   ) : alreadyFilled ? (
-    <div class="container">
-      <div class="done">
-        <h2>入力完了済み</h2>
-        <p>ご入力ありがとうございました。担当者の手続きをお待ちください。</p>
+    <div class="c-container">
+      <div class="c-done">
+        <div class="c-done__icon">&#10003;</div>
+        <div class="c-done__title">入力完了済み</div>
+        <p class="c-done__text">ご入力ありがとうございました。<br>担当者の手続きをお待ちください。</p>
       </div>
     </div>
   ) : (
-    <div class="container">
-      <div class="error" id="errorMsg"></div>
-      <form id="contractForm">
-        <input type="hidden" name="token" value={token}>
+    <>
+      <div class="c-container" id="formContainer">
+        <div class="c-error" id="errorMsg"></div>
+        <form id="contractForm">
+          <input type="hidden" name="token" value={token}>
 
-        <div class="card">
-          <h2>お客様情報</h2>
-          <div class="row">
-            <div class="field">
-              <label>お名前<span class="req">必須</span></label>
-              <input type="text" name="name" required placeholder="結び 太郎">
+          <div class="c-card">
+            <div class="c-card__title">お客様情報</div>
+            <div class="c-row">
+              <div class="c-field">
+                <label class="c-label">お名前<span class="c-label__req">*</span></label>
+                <input type="text" name="name" class="c-input" required placeholder="結び 太郎">
+              </div>
+              <div class="c-field">
+                <label class="c-label">フリガナ<span class="c-label__req">*</span></label>
+                <input type="text" name="nameKana" class="c-input" required placeholder="ムスビ タロウ">
+              </div>
             </div>
-            <div class="field">
-              <label>お名前フリガナ<span class="req">必須</span></label>
-              <input type="text" name="nameKana" required placeholder="ムスビ タロウ">
+            <div class="c-field">
+              <label class="c-label">生年月日<span class="c-label__req">*</span></label>
+              <div class="c-row-3">
+                <select name="birthdayYear" id="birthdayYear" class="c-select" required><option value="">年</option></select>
+                <select name="birthdayMonth" id="birthdayMonth" class="c-select" required><option value="">月</option></select>
+                <select name="birthdayDay" id="birthdayDay" class="c-select" required><option value="">日</option></select>
+              </div>
+              <input type="hidden" name="birthday" id="birthdayHidden">
+            </div>
+            <div class="c-field">
+              <label class="c-label">電話番号<span class="c-label__req">*</span></label>
+              <input type="tel" name="phone" class="c-input" required placeholder="09012345678">
             </div>
           </div>
-          <div class="field">
-            <label>生年月日<span class="req">必須</span></label>
-            <input type="date" name="birthday" required>
-          </div>
-          <div class="field">
-            <label>電話番号<span class="req">必須</span></label>
-            <input type="tel" name="phone" required placeholder="090-1234-5678">
-          </div>
-        </div>
 
-        <div class="card">
-          <h2>ご住所</h2>
-          <div class="field">
-            <label>郵便番号<span class="req">必須</span></label>
-            <input type="text" name="postalCode" required placeholder="123-4567" pattern="\d{3}-?\d{4}">
+          <div class="c-card">
+            <div class="c-card__title">ご住所</div>
+            <div class="c-field">
+              <label class="c-label">郵便番号<span class="c-label__req">*</span></label>
+              <div class="c-postal-row">
+                <input type="text" name="postalCode" id="postalCode" class="c-input" required placeholder="1000001" maxlength="8" inputmode="numeric">
+                <button type="button" id="searchAddr" class="c-postal-btn">検索</button>
+              </div>
+            </div>
+            <div class="c-field">
+              <label class="c-label">住所<span class="c-label__req">*</span></label>
+              <input type="text" name="address" id="address" class="c-input" required placeholder="郵便番号を入力すると自動入力されます">
+            </div>
           </div>
-          <div class="field">
-            <label>住所<span class="req">必須</span></label>
-            <input type="text" name="address" required placeholder="東京都渋谷区...">
-          </div>
-        </div>
 
-        <div class="card">
-          <h2>メールアドレス</h2>
-          <div class="field">
-            <label>メールアドレス<span class="req">必須</span></label>
-            <input type="email" name="email" required placeholder="example@email.com" id="email">
+          <div class="c-card">
+            <div class="c-card__title">メールアドレス</div>
+            <div class="c-field">
+              <label class="c-label">メールアドレス<span class="c-label__req">*</span></label>
+              <input type="email" name="email" class="c-input" required placeholder="example@email.com" id="email">
+            </div>
+            <div class="c-field">
+              <label class="c-label">メールアドレス（確認用）<span class="c-label__req">*</span></label>
+              <input type="email" name="emailConfirm" class="c-input" required placeholder="もう一度入力してください" id="emailConfirm">
+            </div>
           </div>
-          <div class="field">
-            <label>メールアドレス（確認用）<span class="req">必須</span></label>
-            <input type="email" name="emailConfirm" required placeholder="もう一度入力してください" id="emailConfirm">
-          </div>
-        </div>
 
-        <div class="card">
-          <h2>ご確認事項</h2>
-          <div class="check-field">
-            <input type="checkbox" name="coolingOffAgreed" id="coolingOff" required>
-            <span>クーリングオフの内容について確認しました。契約締結日から8日以内であれば、書面またはメールにて無条件で契約を解除できることを理解しています。</span>
-          </div>
-          <div class="check-field">
-            <input type="checkbox" name="notesAgreed" id="notes" required>
-            <span>契約書締結時の留意点について確認しました。サービス内容、料金体系、契約期間等の重要事項を理解した上で契約に同意します。</span>
-          </div>
-        </div>
+          <div class="c-card">
+            <div class="c-card__title">ご確認事項</div>
 
-        <button type="submit" class="btn btn-primary" id="submitBtn">入力内容を送信する</button>
-      </form>
-    </div>
+            <div class="c-agree-section" id="agreeSection1">
+              <div class="c-agree-header">クーリング・オフに関して</div>
+              <div class="c-agree-body">
+                <div class="c-agree-text">
+                  入会申込者がクーリング・オフする場合の規定は下記になります。<br><br>
+                  1. 会員は、当該入会申込書提出日を含む8日間を経過するまで、書面により、無条件に入会申込を解除することができます。（この解除を「クーリング・オフ」といいます。）<br><br>
+                  2. 相談所がクーリング・オフについて不実告知または威迫したことにより、会員が誤認又は困惑して入会契約の解除を行わなかった場合においては、会員は、当会より改めてクーリング・オフができる旨の書面を受領した日を含む8日間を経過するまでは、入会申込を解除することができます。<br><br>
+                  3. 上記１．及び２．による入会申込の解除通告書は、必ず書面により、所定期間内に当会宛てに郵送して下さい。この場合、申込解除は、会員が、当該入会申込書の解除に係る書面を発送した時にその効力を生じます。仮にこの郵便の到着が遅れても、各クーリング・オフ期間内に発したことが証明できる（郵便消印日付など）のであれば、入会申込を解除することができます。<br><br>
+                  4. 上記1.及び2.による入会申込の解除がなされた場合、この申込解除に伴う違約金又は損害賠償は発生しません。又、既にサービスの提供がなされている場合であっても当会は、その料金を請求しません。既にお支払い済みの入会金及び登録料などがある場合は、速やかにその全額を会員に返金します。
+                </div>
+              </div>
+              <div class="c-agree-check">
+                <input type="checkbox" name="coolingOffAgreed" id="coolingOff" required disabled>
+                <span>上記事項に同意します。<small style="color:#94a3b8;"> ※内容を開いてご確認ください</small></span>
+              </div>
+            </div>
+
+            <div class="c-agree-section" id="agreeSection2">
+              <div class="c-agree-header">契約書締結時の留意点について</div>
+              <div class="c-agree-body">
+                <div class="c-agree-text">
+                  本契約の締結にあたり、以下の事項を十分にご理解いただいた上でお申し込みください。<br><br>
+                  ・サービスの内容、料金体系、契約期間等の重要事項を確認しました。<br>
+                  ・中途解約に関する規定を確認しました。<br>
+                  ・個人情報の取り扱いについて確認しました。
+                </div>
+              </div>
+              <div class="c-agree-check">
+                <input type="checkbox" name="notesAgreed" id="notes" required disabled>
+                <span>確認しました。<small style="color:#94a3b8;"> ※内容を開いてご確認ください</small></span>
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 80px;"></div>
+        </form>
+      </div>
+
+      <div class="c-sticky-bottom">
+        <button type="submit" form="contractForm" class="c-btn c-btn--primary" id="submitBtn">入力内容を送信する</button>
+      </div>
+    </>
   )}
 
 <script is:inline>
-document.getElementById('contractForm')?.addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const errEl = document.getElementById('errorMsg');
-  errEl.style.display = 'none';
+(function() {
+  // === Accordion (開いたらチェックボックス有効化) ===
+  document.querySelectorAll('.c-agree-header').forEach(h => {
+    h.addEventListener('click', () => {
+      const section = h.parentElement;
+      section.classList.toggle('open');
+      if (section.classList.contains('open')) {
+        const cb = section.querySelector('input[type="checkbox"]');
+        if (cb) { cb.disabled = false; cb.closest('.c-agree-check').querySelector('small')?.remove(); }
+      }
+    });
+  });
 
-  const email = document.getElementById('email').value;
-  const emailConfirm = document.getElementById('emailConfirm').value;
-  if (email !== emailConfirm) {
-    errEl.textContent = 'メールアドレスが一致しません';
-    errEl.style.display = 'block';
-    return;
+  // === Birthday selects ===
+  const yearSel = document.getElementById('birthdayYear');
+  const monthSel = document.getElementById('birthdayMonth');
+  const daySel = document.getElementById('birthdayDay');
+  const bdHidden = document.getElementById('birthdayHidden');
+  if (yearSel) {
+    const now = new Date();
+    for (let y = now.getFullYear() - 18; y >= now.getFullYear() - 60; y--) {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y + '年';
+      yearSel.appendChild(o);
+    }
+    for (let m = 1; m <= 12; m++) {
+      const o = document.createElement('option');
+      o.value = String(m).padStart(2, '0'); o.textContent = m + '月';
+      monthSel.appendChild(o);
+    }
+    function updateDays() {
+      const y = parseInt(yearSel.value) || 2000, m = parseInt(monthSel.value) || 1;
+      const max = new Date(y, m, 0).getDate(), cur = daySel.value;
+      daySel.innerHTML = '<option value="">日</option>';
+      for (let d = 1; d <= max; d++) {
+        const o = document.createElement('option');
+        o.value = String(d).padStart(2, '0'); o.textContent = d + '日';
+        daySel.appendChild(o);
+      }
+      if (parseInt(cur) <= max) daySel.value = cur;
+    }
+    yearSel.addEventListener('change', updateDays);
+    monthSel.addEventListener('change', updateDays);
+    updateDays();
+    function syncBd() {
+      const y = yearSel.value, m = monthSel.value, d = daySel.value;
+      bdHidden.value = (y && m && d) ? y + '-' + m + '-' + d : '';
+    }
+    [yearSel, monthSel, daySel].forEach(s => s.addEventListener('change', syncBd));
   }
 
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = '送信中...';
+  // === Postal code search (server proxy) ===
+  const postalInput = document.getElementById('postalCode');
+  const searchBtn = document.getElementById('searchAddr');
+  async function searchAddress() {
+    const postal = postalInput.value.replace(/[-ー－\s]/g, '');
+    if (!/^\d{7}$/.test(postal)) return;
+    searchBtn.textContent = '...';
+    searchBtn.disabled = true;
+    try {
+      const res = await fetch('/api/postal?zip=' + postal);
+      const data = await res.json();
+      if (data.address) {
+        document.getElementById('address').value = data.address;
+        document.getElementById('address').focus();
+      }
+    } catch {}
+    searchBtn.textContent = '検索';
+    searchBtn.disabled = false;
+  }
+  searchBtn?.addEventListener('click', searchAddress);
+  postalInput?.addEventListener('input', function() {
+    if (/^\d{7}$/.test(this.value.replace(/[-ー－\s]/g, ''))) searchAddress();
+  });
 
-  const fd = new FormData(this);
-  const body = {
-    token: fd.get('token'),
-    email: fd.get('email'),
-    name: fd.get('name'),
-    nameKana: fd.get('nameKana'),
-    phone: fd.get('phone'),
-    birthday: fd.get('birthday'),
-    postalCode: fd.get('postalCode'),
-    address: fd.get('address'),
-    coolingOffAgreed: fd.get('coolingOffAgreed') === 'on',
-    notesAgreed: fd.get('notesAgreed') === 'on',
-  };
-
-  try {
-    const res = await fetch('/api/contract/submit-form', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      document.querySelector('.container').innerHTML =
-        '<div class="done"><div class="spinner"></div><h2>送信完了</h2><p>ご入力ありがとうございました。<br>担当者が手続き中です。このまましばらくお待ちください...</p></div>';
-      // ポーリング開始: 営業が単価設定したら署名画面へ自動遷移
-      const pollToken = body.token;
-      const poll = setInterval(async () => {
-        try {
-          const sr = await fetch('/api/contract/status?token=' + pollToken);
-          if (!sr.ok) return;
-          const sd = await sr.json();
-          if (sd.status === 'priced' || sd.status === 'signed' || sd.status === 'payment_done') {
-            clearInterval(poll);
-            location.href = '/contract/' + pollToken + '/sign';
-          }
-        } catch {}
-      }, 3000);
-    } else {
-      errEl.textContent = data.error || '送信に失敗しました';
+  // === Form submit ===
+  document.getElementById('contractForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+    if (document.getElementById('email').value !== document.getElementById('emailConfirm').value) {
+      errEl.textContent = 'メールアドレスが一致しません';
+      errEl.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const bd = document.getElementById('birthdayHidden').value;
+    if (!bd) {
+      errEl.textContent = '生年月日を選択してください';
+      errEl.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+    const fd = new FormData(this);
+    const body = {
+      token: fd.get('token'), email: fd.get('email'), name: fd.get('name'),
+      nameKana: fd.get('nameKana'), phone: fd.get('phone'), birthday: bd,
+      postalCode: fd.get('postalCode'), address: fd.get('address'),
+      coolingOffAgreed: fd.get('coolingOffAgreed') === 'on',
+      notesAgreed: fd.get('notesAgreed') === 'on',
+    };
+    try {
+      const res = await fetch('/api/contract/submit-form', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.querySelector('.c-sticky-bottom').style.display = 'none';
+        document.getElementById('formContainer').innerHTML =
+          '<div class="c-done"><div class="c-spinner"></div><div class="c-done__title c-mt-16">送信完了</div><p class="c-done__text">ご入力ありがとうございました。<br>担当者が手続き中です。<br>このまましばらくお待ちください...</p></div>';
+        const t = body.token;
+        const poll = setInterval(async () => {
+          try {
+            const r = await fetch('/api/contract/status?token=' + t);
+            if (!r.ok) return;
+            const d = await r.json();
+            if (d.status === 'priced') { clearInterval(poll); location.href = '/contract/' + t + '/sign'; }
+            else if (d.status === 'signed') { clearInterval(poll); location.href = '/contract/' + t + '/payment'; }
+            else if (d.status === 'payment_done') { clearInterval(poll); location.href = '/contract/' + t + '/complete'; }
+          } catch {}
+        }, 3000);
+      } else {
+        errEl.textContent = data.error || '送信に失敗しました';
+        errEl.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch {
+      errEl.textContent = '通信エラーが発生しました';
       errEl.style.display = 'block';
     }
-  } catch (err) {
-    errEl.textContent = '通信エラーが発生しました';
-    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '入力内容を送信する';
+  });
+
+  // === Activity tracking ===
+  const tkn = document.querySelector('input[name="token"]')?.value;
+  if (tkn) {
+    function sendActivity(detail) {
+      fetch('/api/contract/activity', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tkn, page: 'form', detail }),
+      }).catch(() => {});
+    }
+    // 入力中のフィールドを追跡
+    const fieldLabels = { name: 'お名前', nameKana: 'フリガナ', phone: '電話番号', postalCode: '郵便番号', address: '住所', email: 'メールアドレス', emailConfirm: 'メール確認' };
+    document.querySelectorAll('.c-input, .c-select').forEach(el => {
+      el.addEventListener('focus', () => {
+        const n = el.name || el.id;
+        sendActivity((fieldLabels[n] || n) + 'を入力中');
+      });
+    });
+    // 定期送信（5秒）
+    setInterval(() => sendActivity('フォーム画面を閲覧中'), 5000);
+    sendActivity('フォーム画面を開きました');
   }
-  btn.disabled = false;
-  btn.textContent = '入力内容を送信する';
-});
+})();
 </script>
 </body>
 </html>

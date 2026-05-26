@@ -1,0 +1,104 @@
+---
+export const prerender = false;
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { getMemberStatusSnapshot, getMarriageRate } from '../../lib/dashboard/members';
+
+let snapshot, marriage, error;
+try {
+  [snapshot, marriage] = await Promise.all([getMemberStatusSnapshot(), getMarriageRate()]);
+} catch (e: any) {
+  error = e.message || String(e);
+}
+
+const num = (n: number) => Math.round(n).toLocaleString('ja-JP');
+const pct = (n: number | null) => n == null ? '-' : `${n.toFixed(2)}%`;
+
+const statusOrder = [
+  '今月お見合い未成立', '今月お見合い成立', 'プレ交際', '真剣交際',
+  '今月成婚', '成婚済み', '今月休会', '休会済み', '今月退会'
+];
+---
+<DashboardLayout title="会員ステータス / プランナー" active="members" fetchedAt={snapshot?.fetchedAt}>
+  {error && <div class="section"><strong style="color:var(--red)">エラー:</strong> {error}</div>}
+
+  {snapshot && (
+    <>
+      <div class="section">
+        <h3>会員ステータス スナップショット ({snapshot.date} 時点)</h3>
+        <div class="tiles">
+          {statusOrder.filter(s => snapshot.byStatus[s] != null).map(s => (
+            <div class="tile">
+              <div class="label">{s}</div>
+              <div class="value">{num(snapshot.byStatus[s] || 0)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>プランナー別 担当会員数 (active: お見合いステージ + 交際中)</h3>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>プランナー</th><th>持ち会員数</th><th>分布</th></tr></thead>
+            <tbody>
+              {Object.entries(snapshot.byPlanner)
+                .sort((a, b) => b[1] - a[1])
+                .map(([planner, count]) => {
+                  const max = Math.max(...Object.values(snapshot.byPlanner));
+                  const w = max > 0 ? (count / max) * 100 : 0;
+                  return (
+                    <tr>
+                      <td class="text">{planner}</td>
+                      <td class="bold">{num(count)}</td>
+                      <td><span class="bar" style="width:200px"><span style={`width:${w}%`}></span></span></td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+        <p style="color:var(--text-muted);font-size:11px;margin-top:8px">※ 元シート「メンズリフト_会員分析シート / 会員ステータス日次集計」</p>
+      </div>
+    </>
+  )}
+
+  {marriage && marriage.length > 0 && (
+    <div class="section">
+      <h3>月次 成婚 / 休会 / 退会 推移</h3>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>月</th>
+              <th>通常</th>
+              <th>休会</th>
+              <th>中途退会</th>
+              <th>成婚</th>
+              <th>休会率</th>
+              <th>中途退会率</th>
+              <th>基本成婚率</th>
+              <th>真剣交際→成婚</th>
+              <th>アクティブ→成婚</th>
+            </tr>
+          </thead>
+          <tbody>
+            {marriage.map(m => (
+              <tr>
+                <td class="text">{m.month}</td>
+                <td>{num(m.active)}</td>
+                <td class="dim">{num(m.pause)}</td>
+                <td class="dim">{num(m.midWithdraw)}</td>
+                <td class="bold pos">{num(m.marriage)}</td>
+                <td class={(m.pauseRate ?? 0) > 8 ? 'warn' : 'dim'}>{pct(m.pauseRate)}</td>
+                <td class={(m.midWithdrawRate ?? 0) > 5 ? 'warn' : 'dim'}>{pct(m.midWithdrawRate)}</td>
+                <td>{pct(m.basicMarriageRate)}</td>
+                <td>{pct(m.seriousToMarriageRate)}</td>
+                <td>{pct(m.activeToMarriageRate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+</DashboardLayout>

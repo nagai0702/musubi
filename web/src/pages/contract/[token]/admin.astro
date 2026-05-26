@@ -85,6 +85,15 @@ const contract = found?.contract;
         </span>
       </div>
 
+      <!-- 顧客操作状況 -->
+      <div class="card" id="activityCard" style="padding:12px 24px; display:none;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="activityDot" style="width:8px; height:8px; border-radius:50%; background:#10b981; flex-shrink:0;"></span>
+          <span style="font-size:12px; color:#666;">顧客の操作状況</span>
+        </div>
+        <div id="activityDetail" style="font-size:14px; font-weight:500; margin-top:4px; padding-left:16px;"></div>
+      </div>
+
       <!-- Phase 1: 顧客入力待ち -->
       <div class={`phase ${contract.status === 'draft' ? 'active' : ''}`} id="phase-draft">
         <div class="card">
@@ -135,6 +144,8 @@ const contract = found?.contract;
                 <input type="date" name="activityStartDate" required>
               </div>
             </div>
+            <hr style="border:none; border-top:1px solid #f1f5f9; margin:12px 0;">
+            <p style="font-size:12px; color:#999; margin-bottom:8px;">初期費用</p>
             <div class="field">
               <label>【初期費用】支払い方法</label>
               <select name="initialPaymentMethod" required>
@@ -152,6 +163,12 @@ const contract = found?.contract;
                 <input type="text" name="paymentInstallments" placeholder="例: 一括">
               </div>
             </div>
+            <div class="field">
+              <label>初期費用（税込）</label>
+              <input type="text" name="initialCost" placeholder="例: ¥275,000">
+            </div>
+            <hr style="border:none; border-top:1px solid #f1f5f9; margin:12px 0;">
+            <p style="font-size:12px; color:#999; margin-bottom:8px;">月額費用</p>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div class="field">
                 <label>【月額費用】支払い方法</label>
@@ -162,12 +179,35 @@ const contract = found?.contract;
                 </select>
               </div>
               <div class="field">
+                <label>【月額費用】支払い日</label>
+                <select name="monthlyPaymentDay">
+                  <option value="毎月28日">毎月28日</option>
+                  <option value="毎月1日">毎月1日</option>
+                  <option value="毎月15日">毎月15日</option>
+                  <option value="毎月末日">毎月末日</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="field">
                 <label>【月額費用】縛り期間</label>
                 <select name="contractPeriod">
                   <option value="12か月">12か月</option>
                   <option value="3ヶ月">3ヶ月</option>
                 </select>
               </div>
+              <div class="field">
+                <label>【月額費用】支払い区分</label>
+                <select name="monthlyPaymentType">
+                  <option value="分割払い（割賦販売契約）">分割払い（割賦販売契約）</option>
+                  <option value="一括払い">一括払い</option>
+                </select>
+              </div>
+            </div>
+            <hr style="border:none; border-top:1px solid #f1f5f9; margin:12px 0;">
+            <div class="field">
+              <label>成婚費用（税込）</label>
+              <input type="text" name="marriageFee" value="¥220,000" placeholder="¥220,000">
             </div>
             <hr style="border:none; border-top:1px solid #e5e7eb; margin:16px 0;">
             <div class="field">
@@ -264,20 +304,43 @@ const contract = found?.contract;
     currentStatus = newStatus;
   }
 
+  // アクティビティ表示用
+  const actCard = document.getElementById('activityCard');
+  const actDot = document.getElementById('activityDot');
+  const actDetail = document.getElementById('activityDetail');
+  const pageLabels = { form: '入力フォーム', sign: '契約書確認・押印', payment: '決済画面', complete: '完了画面' };
+
   let pollTimer = setInterval(async () => {
     try {
+      // ステータス確認
       const res = await fetch('/api/contract/status?token=' + token);
       if (!res.ok) return;
       const data = await res.json();
       if (data.status !== currentStatus) {
         if (data.status === 'customer_filled') {
-          // ページリロードで最新の顧客情報を反映
           location.reload();
         } else {
           switchPhase(data.status, data);
         }
       }
       if (data.status === 'payment_done') clearInterval(pollTimer);
+
+      // アクティビティ確認
+      const actRes = await fetch('/api/contract/activity?token=' + token);
+      if (actRes.ok) {
+        const act = await actRes.json();
+        if (act.online && act.detail) {
+          actCard.style.display = 'block';
+          actDot.style.background = '#10b981';
+          actDetail.textContent = (pageLabels[act.page] || act.page) + ' — ' + act.detail;
+        } else if (act.detail) {
+          actCard.style.display = 'block';
+          actDot.style.background = '#94a3b8';
+          actDetail.textContent = '(オフライン) 最後の操作: ' + act.detail;
+        } else {
+          actCard.style.display = 'none';
+        }
+      }
     } catch {}
   }, 3000);
 
@@ -306,7 +369,11 @@ const contract = found?.contract;
           upfrontPayment: fd.get('upfrontPayment'),
           paymentInstallments: fd.get('paymentInstallments'),
           monthlyPaymentMethod: fd.get('monthlyPaymentMethod'),
+          monthlyPaymentDay: fd.get('monthlyPaymentDay'),
+          monthlyPaymentType: fd.get('monthlyPaymentType'),
           contractPeriod: fd.get('contractPeriod'),
+          initialCost: fd.get('initialCost'),
+          marriageFee: fd.get('marriageFee'),
           paymentMethod: fd.get('paymentMethod'),
         }),
       });
