@@ -7,6 +7,7 @@ credentials/
 *credentials*.json
 *secret*.json
 tokens.json
+.sheets-token.json
 .mcp.json
 
 # APIキー・トークンを含む可能性のあるファイル
@@ -35,3 +36,13 @@ package-lock.json
 *.log
 .aidesigner/*
 !.aidesigner/.gitkeep
+
+# Obsidian Vault
+obsidian-vault/.obsidian/workspace*.json
+obsidian-vault/.obsidian/cache
+obsidian-vault/.trash/
+obsidian-vault/raw/private/
+
+# Split out into its own repo
+contract-app/
+
