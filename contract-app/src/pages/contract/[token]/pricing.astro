@@ -1,0 +1,153 @@
+---
+import { getSession } from '@/lib/session';
+import { getByToken } from '@/lib/contracts';
+const user = getSession(Astro.cookies);
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>単価・決済方法設定 - 結び</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; min-height: 100vh; }
+    .header { background: #fff; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .container { max-width: 540px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f9fafb; font-size: 14px; }
+    .info-row .label { color: #666; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
+    .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; }
+    .field input:focus, .field select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .error { display: none; padding: 12px; background: #fef2f2; color: #b91c1c; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    .no-auth { text-align: center; padding: 60px 20px; }
+    .no-auth a { color: #2563eb; }
+    .url-box { margin-top: 16px; padding: 12px; background: #f0fdf4; border-radius: 8px; font-size: 13px; display: none; }
+    .url-box a { color: #2563eb; word-break: break-all; }
+    .copy-btn { display: inline-block; margin-top: 8px; padding: 6px 16px; background: #10b981; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>単価・決済方法設定</h1>
+    <span style="font-size: 14px; color: #666;">{user?.name || ''}</span>
+  </div>
+
+  {!user ? (
+    <div class="no-auth">
+      <p>営業担当者のみアクセスできます</p>
+      <a href="/api/auth/slack/login">Slackでログイン</a>
+    </div>
+  ) : !contract ? (
+    <div class="no-auth"><p>契約が見つかりません</p></div>
+  ) : contract.status !== 'customer_filled' ? (
+    <div class="no-auth">
+      <p>この契約は現在「{contract.status}」の状態です。</p>
+      <p>顧客情報の入力完了後に単価を設定できます。</p>
+    </div>
+  ) : (
+    <div class="container">
+      <div class="error" id="errorMsg"></div>
+
+      <div class="card">
+        <h2>顧客情報</h2>
+        <div class="info-row"><span class="label">お名前</span><span>{contract.name}</span></div>
+        <div class="info-row"><span class="label">フリガナ</span><span>{contract.nameKana}</span></div>
+        <div class="info-row"><span class="label">メール</span><span>{contract.email}</span></div>
+        <div class="info-row"><span class="label">電話番号</span><span>{contract.phone}</span></div>
+        <div class="info-row"><span class="label">生年月日</span><span>{contract.birthday}</span></div>
+        <div class="info-row"><span class="label">住所</span><span>{contract.postalCode} {contract.address}</span></div>
+        <div class="info-row"><span class="label">顧客ID</span><span>{contract.customerId}</span></div>
+      </div>
+
+      <div class="card">
+        <h2>単価・決済方法</h2>
+        <form id="pricingForm">
+          <input type="hidden" name="token" value={token}>
+          <div class="field">
+            <label>単価（税込・円）</label>
+            <input type="number" name="price" required min="0" step="1" placeholder="例: 330000">
+          </div>
+          <div class="field">
+            <label>決済方法</label>
+            <select name="paymentMethod" required>
+              <option value="">選択してください</option>
+              <option value="transfer">振込</option>
+              <option value="credit">クレジットカード（テレコムクレジット）</option>
+              <option value="lifti">ライフティ（日程調整）</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" id="submitBtn">確定して契約書を生成</button>
+        </form>
+        <div class="url-box" id="signUrlBox">
+          <strong>署名用URL（顧客に共有）:</strong><br>
+          <a id="signUrl" href="#" target="_blank"></a>
+          <br><button class="copy-btn" id="copySignUrl">URLをコピー</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+<script is:inline>
+document.getElementById('pricingForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '処理中...';
+
+  const fd = new FormData(this);
+  const body = {
+    token: fd.get('token'),
+    price: fd.get('price'),
+    paymentMethod: fd.get('paymentMethod'),
+  };
+
+  try {
+    const res = await fetch('/api/contract/set-pricing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const signUrl = location.origin + '/contract/' + body.token + '/sign';
+      document.getElementById('signUrl').href = signUrl;
+      document.getElementById('signUrl').textContent = signUrl;
+      document.getElementById('signUrlBox').style.display = 'block';
+      document.getElementById('copySignUrl').addEventListener('click', function() {
+        navigator.clipboard.writeText(signUrl);
+        this.textContent = 'コピーしました!';
+        setTimeout(() => { this.textContent = 'URLをコピー'; }, 2000);
+      });
+      btn.textContent = '設定完了';
+      btn.disabled = true;
+    } else {
+      errEl.textContent = data.error || '処理に失敗しました';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '確定して契約書を生成';
+    }
+  } catch (err) {
+    errEl.textContent = '通信エラーが発生しました';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '確定して契約書を生成';
+  }
+});
+</script>
+</body>
+</html>

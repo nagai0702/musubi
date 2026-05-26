@@ -1,0 +1,373 @@
+---
+import { getByToken } from '@/lib/contracts';
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+const contract = found?.contract;
+const canSign = contract?.status === 'priced';
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>契約書確認・押印 - 結び</title>
+  <link rel="stylesheet" href="/contract.css">
+  <style>
+    .warn-box {
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: #b91c1c;
+      line-height: 1.6; text-align: center;
+    }
+    .section-label {
+      font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 2px solid #0f172a;
+    }
+
+    /* PDF thumbnails */
+    .pdf-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
+    .pdf-thumb {
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 10px;
+      overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .pdf-thumb:hover { border-color: #6366f1; }
+    .pdf-thumb.viewed { border-color: #10b981; }
+    .pdf-thumb__img {
+      width: 100%; aspect-ratio: 210/297; background: #f8fafc;
+      overflow: hidden; position: relative;
+    }
+    .pdf-thumb__img iframe {
+      width: 300%; height: 300%; border: none; transform: scale(0.333); transform-origin: top left; pointer-events: none;
+    }
+    .pdf-thumb__check {
+      position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
+      border-radius: 50%; background: #10b981; color: #fff;
+      display: none; align-items: center; justify-content: center; font-size: 10px;
+    }
+    .pdf-thumb.viewed .pdf-thumb__check { display: flex; }
+    .pdf-thumb__name { padding: 6px 4px; text-align: center; font-size: 10px; font-weight: 600; color: #475569; }
+    .pdf-hint { font-size: 11px; color: #94a3b8; text-align: center; margin-bottom: 16px; }
+
+    /* Full viewer modal */
+    .pdf-modal {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.85); flex-direction: column;
+    }
+    .pdf-modal.open { display: flex; }
+    .pdf-modal__bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: #0f172a; color: #fff; flex-shrink: 0;
+    }
+    .pdf-modal__title { font-size: 13px; font-weight: 600; }
+    .pdf-modal__close {
+      width: 32px; height: 32px; border-radius: 8px; border: none;
+      background: rgba(255,255,255,0.1); color: #fff; font-size: 18px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .pdf-modal__body { flex: 1; overflow: auto; display: flex; justify-content: center; background: #1e293b; padding: 8px; }
+    .pdf-modal__body iframe { width: 100%; max-width: 900px; border: none; background: #fff; border-radius: 4px; }
+    .pdf-modal__nav {
+      display: flex; gap: 6px; padding: 10px 16px; background: #0f172a; justify-content: center; flex-shrink: 0;
+    }
+    .pdf-modal__nav button {
+      padding: 7px 14px; border-radius: 6px; border: 1px solid #475569;
+      background: transparent; color: #94a3b8; font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .pdf-modal__nav button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+    /* Stamp */
+    .stamp-area { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .stamp-input { flex: 1; }
+    @media (max-width: 480px) {
+      .stamp-area { flex-direction: column; align-items: stretch; }
+      .c-stamp-preview { align-self: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="c-header">
+    <div class="c-header__inner">
+      <div>
+        <div class="c-header__brand">株式会社結び</div>
+        <div class="c-header__sub">ご契約内容確認</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="c-steps">
+    <div class="c-steps__inner">
+      <div class="c-step done"><span class="c-step__num">&#10003;</span><span class="c-step__label">入力</span></div>
+      <div class="c-step active"><span class="c-step__num">2</span><span class="c-step__label">確認・押印</span></div>
+      <div class="c-step"><span class="c-step__num">3</span><span class="c-step__label">決済</span></div>
+      <div class="c-step"><span class="c-step__num">4</span><span class="c-step__label">完了</span></div>
+    </div>
+  </div>
+
+  {!contract ? (
+    <div class="c-container"><div class="c-done"><div class="c-done__icon">!</div><div class="c-done__title">無効なリンク</div></div></div>
+  ) : !canSign ? (
+    <div class="c-container"><div class="c-done">
+      <div class="c-done__icon">{contract.status === 'signed' ? '\u2713' : '!'}</div>
+      <div class="c-done__title">{contract.status === 'signed' ? '押印済み' : '押印できません'}</div>
+    </div></div>
+  ) : (
+    <>
+      <div class="c-container">
+
+        <div class="warn-box">
+          ご注意：まだ契約手続きは完了しておりません。<br>
+          ご確認後、ページ下の【押印して契約を確定する】ボタンを押して下さい。
+        </div>
+
+        <!-- 契約者情報 -->
+        <div class="c-card">
+          <div class="section-label">ご契約者情報</div>
+          <div class="c-info-row"><span class="c-info-row__label">お名前</span><span class="c-info-row__value">{contract.name}（{contract.nameKana}）</span></div>
+          <div class="c-info-row"><span class="c-info-row__label">メール</span><span class="c-info-row__value">{contract.email}</span></div>
+          <div class="c-info-row"><span class="c-info-row__label">電話番号</span><span class="c-info-row__value">{contract.phone}</span></div>
+          <div class="c-info-row"><span class="c-info-row__label">住所</span><span class="c-info-row__value">{contract.postalCode} {contract.address}</span></div>
+          <div class="c-info-row"><span class="c-info-row__label">生年月日</span><span class="c-info-row__value">{contract.birthday}</span></div>
+          <div class="c-info-row"><span class="c-info-row__label">顧客ID</span><span class="c-info-row__value">{contract.customerId}</span></div>
+        </div>
+
+        <!-- 契約書類 -->
+        <div class="c-card">
+          <div class="section-label">契約書類の確認</div>
+          <p class="pdf-hint">各書類をタップして内容をご確認ください</p>
+          <div class="pdf-thumbs">
+            <div class="pdf-thumb" data-sheet="0">
+              <div class="pdf-thumb__img" style="display:flex; align-items:center; justify-content:center; font-size:28px; background:#f1f5f9;">📄</div>
+              <div class="pdf-thumb__check">&#10003;</div>
+              <div class="pdf-thumb__name">利用申込契約書</div>
+            </div>
+            <div class="pdf-thumb" data-sheet="1">
+              <div class="pdf-thumb__img" style="display:flex; align-items:center; justify-content:center; font-size:28px; background:#f1f5f9;">📄</div>
+              <div class="pdf-thumb__check">&#10003;</div>
+              <div class="pdf-thumb__name">サービス概要書面</div>
+            </div>
+            <div class="pdf-thumb" data-sheet="2">
+              <div class="pdf-thumb__img" style="display:flex; align-items:center; justify-content:center; font-size:28px; background:#f1f5f9;">📄</div>
+              <div class="pdf-thumb__check">&#10003;</div>
+              <div class="pdf-thumb__name">サービス利用料金</div>
+            </div>
+          </div>
+          <p class="pdf-hint" id="pdfProgress">残り2件の書類を確認してください</p>
+        </div>
+
+        <!-- 重要事項 -->
+        <div class="c-card">
+          <div class="section-label">重要事項のご確認</div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:8px;">クーリング・オフに関して</div>
+            <p style="font-size:12px; line-height:1.8; color:#475569;">
+              契約書面受領日を含む8日間以内であれば、書面又は電磁的記録により無条件に契約を解除できます。解除に伴う違約金・損害賠償は発生せず、お支払い済みの金額は全額返金されます。
+            </p>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+              <input type="checkbox" id="chkCooling" style="width:22px; height:22px; accent-color:#6366f1; cursor:pointer; flex-shrink:0;">
+              <span style="font-size:13px; font-weight:600;">上記事項を確認し同意します。</span>
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:8px;">中途解約について</div>
+            <p style="font-size:12px; line-height:1.8; color:#475569;">
+              退会希望月の前月5日までに担当者にご連絡のうえ、所定の退会届をご提出ください。未払サービス料金は当社所定の方法により精算いたします。
+            </p>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+              <input type="checkbox" id="chkCancel" style="width:22px; height:22px; accent-color:#6366f1; cursor:pointer; flex-shrink:0;">
+              <span style="font-size:13px; font-weight:600;">確認しました。</span>
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:8px;">契約書面の電磁的交付について</div>
+            <p style="font-size:12px; line-height:1.8; color:#475569;">
+              押印完了後、ご登録のメールアドレスに契約書類PDFをお送りします。紙面での再交付をご希望の場合は、担当者までお申し付けください。
+            </p>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+              <input type="checkbox" id="chkDigital" style="width:22px; height:22px; accent-color:#6366f1; cursor:pointer; flex-shrink:0;">
+              <span style="font-size:13px; font-weight:600;">電磁的交付に同意します。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 押印 -->
+        <div class="c-card">
+          <div class="section-label">押印</div>
+          <div class="stamp-area">
+            <div class="stamp-input">
+              <label class="c-label">押印するお名前</label>
+              <input type="text" id="stampName" class="c-input" placeholder="例: 永井" maxlength="6">
+            </div>
+            <div class="c-stamp-preview empty" id="stampPreview">
+              <span class="c-stamp-text" id="stampText">印</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="c-error" id="errorMsg"></div>
+
+        <div style="height:100px;"></div>
+      </div>
+
+      <div class="c-sticky-bottom">
+        <p style="font-size:11px; color:#64748b; text-align:center; margin-bottom:8px;">【注意】ボタンは一度だけタップしてください。</p>
+        <button class="c-btn c-btn--primary" id="submitBtn" disabled>上記に同意の上 押印して契約を確定する</button>
+      </div>
+
+      <!-- PDF Modal -->
+      <div class="pdf-modal" id="pdfModal">
+        <div class="pdf-modal__bar">
+          <span class="pdf-modal__title" id="modalTitle"></span>
+          <button class="pdf-modal__close" id="modalClose">&times;</button>
+        </div>
+        <div class="pdf-modal__body">
+          <div id="modalLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;">
+            <div class="c-spinner"></div>
+          </div>
+          <iframe id="modalFrame" src="about:blank" onload="document.getElementById('modalLoading').style.display='none'"></iframe>
+        </div>
+        <div class="pdf-modal__nav">
+          <button data-sheet="0">契約書</button>
+          <button data-sheet="1">概要書面</button>
+          <button data-sheet="2">利用料金</button>
+        </div>
+      </div>
+    </>
+  )}
+
+<script is:inline>
+(function() {
+  const modal = document.getElementById('pdfModal');
+  if (!modal) return;
+  const token = new URL(location.href).pathname.split('/')[2];
+  const labels = ['利用申込契約書', 'サービス概要書面', 'サービス利用料金'];
+  const viewed = new Set();
+
+  // PDF thumbs → open modal
+  document.querySelectorAll('.pdf-thumb').forEach(t => {
+    t.addEventListener('click', function() {
+      openModal(this.dataset.sheet);
+      this.classList.add('viewed');
+      viewed.add(this.dataset.sheet);
+      updateProgress();
+    });
+  });
+  function openModal(s) {
+    document.getElementById('modalLoading').style.display = 'flex';
+    document.getElementById('modalFrame').src = '/api/contract/pdf?token=' + token + '&sheet=' + s;
+    document.getElementById('modalTitle').textContent = labels[s];
+    modal.querySelectorAll('.pdf-modal__nav button').forEach(b => b.classList.toggle('active', b.dataset.sheet === s));
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  modal.querySelectorAll('.pdf-modal__nav button').forEach(b => {
+    b.addEventListener('click', function() {
+      openModal(this.dataset.sheet);
+      document.querySelector('.pdf-thumb[data-sheet="'+this.dataset.sheet+'"]').classList.add('viewed');
+      viewed.add(this.dataset.sheet);
+      updateProgress();
+    });
+  });
+  document.getElementById('modalClose').addEventListener('click', () => {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+    document.getElementById('modalFrame').src = 'about:blank';
+  });
+  // Stamp preview
+  var stampInput = document.getElementById('stampName');
+  var preview = document.getElementById('stampPreview');
+  var sText = document.getElementById('stampText');
+
+  // Submit validation
+  var chks = [document.getElementById('chkCooling'), document.getElementById('chkCancel'), document.getElementById('chkDigital')];
+  var submitBtn = document.getElementById('submitBtn');
+  function updateSubmit() {
+    var allChecked = chks.every(function(c) { return c.checked; });
+    var allViewed = viewed.size >= 3;
+    var hasStamp = stampInput.value.trim().length > 0;
+    submitBtn.disabled = !(allChecked && allViewed && hasStamp);
+  }
+  chks.forEach(function(c) { c.addEventListener('change', updateSubmit); });
+
+  function updateProgress() {
+    var el = document.getElementById('pdfProgress');
+    if (viewed.size >= 3) el.textContent = '全ての書類を確認済みです';
+    else el.textContent = '残り' + (3 - viewed.size) + '件の書類を確認してください';
+    updateSubmit();
+  }
+  updateProgress();
+
+  // 値のポーリングで確実にIME変換後も検知（50ms間隔）
+  var lastStampVal = '';
+  setInterval(function() {
+    var n = stampInput.value.trim();
+    if (n === lastStampVal) return;
+    lastStampVal = n;
+    if (n) {
+      preview.classList.remove('empty');
+      if (n.length <= 2) { sText.textContent = n; sText.style.fontSize = '16px'; }
+      else if (n.length <= 3) { sText.textContent = n; sText.style.fontSize = '14px'; }
+      else if (n.length <= 4) { sText.textContent = n.slice(0,2)+'\n'+n.slice(2); sText.style.fontSize = '14px'; }
+      else { sText.textContent = n.slice(0,3)+'\n'+n.slice(3); sText.style.fontSize = '12px'; }
+      sText.style.whiteSpace = 'pre-line';
+    } else { preview.classList.add('empty'); sText.textContent = '印'; sText.style.fontSize = '16px'; }
+    updateSubmit();
+  }, 50);
+
+  // Submit
+  submitBtn.addEventListener('click', async () => {
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = '処理中...';
+    // Generate stamp image
+    const cv = document.createElement('canvas'); cv.width = 200; cv.height = 200;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, 200, 200);
+    ctx.beginPath(); ctx.arc(100, 100, 90, 0, Math.PI * 2); ctx.strokeStyle = '#cc0000'; ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = '#cc0000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const name = stampInput.value.trim();
+    const font = '"Yu Mincho","Hiragino Mincho ProN",serif';
+    if (name.length <= 2) { ctx.font = 'bold 60px '+font; ctx.fillText(name, 100, 105); }
+    else if (name.length <= 3) { ctx.font = 'bold 44px '+font; ctx.fillText(name, 100, 105); }
+    else if (name.length <= 4) { ctx.font = 'bold 38px '+font; ctx.fillText(name.slice(0,2), 100, 80); ctx.fillText(name.slice(2), 100, 125); }
+    else { ctx.font = 'bold 30px '+font; ctx.fillText(name.slice(0,3), 100, 78); ctx.fillText(name.slice(3), 100, 122); }
+    try {
+      const res = await fetch('/api/contract/submit-signature', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, signatureData: cv.toDataURL('image/png') }),
+      });
+      const data = await res.json();
+      if (res.ok) location.href = '/contract/' + token + '/payment';
+      else { errEl.textContent = data.error || '送信に失敗しました'; errEl.style.display = 'block'; submitBtn.disabled = false; submitBtn.textContent = '上記に同意の上 押印して契約を確定する'; }
+    } catch { errEl.textContent = '通信エラー'; errEl.style.display = 'block'; submitBtn.disabled = false; submitBtn.textContent = '上記に同意の上 押印して契約を確定する'; }
+  });
+
+  // === Activity tracking ===
+  function sendAct(detail) {
+    fetch('/api/contract/activity', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, page: 'sign', detail }),
+    }).catch(() => {});
+  }
+  // PDFタブ切り替え追跡
+  const origOpenModal = openModal;
+  // タブクリック追跡は既存のイベントで
+  document.querySelectorAll('.pdf-thumb').forEach(t => {
+    t.addEventListener('click', () => sendAct(labels[t.dataset.sheet] + 'を閲覧中'));
+  });
+  // チェックボックス追跡
+  chks.forEach((c, i) => {
+    const names = ['クーリングオフ', '中途解約', '電磁的交付'];
+    c.addEventListener('change', () => { if (c.checked) sendAct(names[i] + 'に同意'); });
+  });
+  stampInput.addEventListener('input', () => { if (stampInput.value.trim()) sendAct('押印名を入力中'); });
+  setInterval(() => sendAct(viewed.size + '/3書類確認済み'), 5000);
+  sendAct('契約書確認画面を開きました');
+})();
+</script>
+</body>
+</html>

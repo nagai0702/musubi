@@ -1,0 +1,75 @@
+---
+import { getByToken, updateContract } from '@/lib/contracts';
+const { token } = Astro.params;
+const found = token ? await getByToken(token) : null;
+if (found?.contract.status === 'signed') {
+  await updateContract(token!, { status: 'payment_done' });
+}
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>お手続き完了 - 結び</title>
+  <link rel="stylesheet" href="/contract.css">
+  <style>
+    body { display: flex; flex-direction: column; }
+    .complete-wrap { flex: 1; display: flex; flex-direction: column; }
+    .complete-check {
+      width: 96px; height: 96px; border-radius: 50%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 44px; margin: 0 auto 24px;
+      animation: popIn 0.5s ease;
+    }
+    @keyframes popIn { 0% { transform: scale(0); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    .complete-title { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+    .complete-text { font-size: 14px; color: #64748b; line-height: 2; }
+    .complete-divider { width: 40px; height: 3px; background: #e2e8f0; border-radius: 2px; margin: 32px auto; }
+    .complete-brand { font-size: 13px; color: #94a3b8; font-weight: 500; }
+    .complete-mail {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: 8px; font-size: 13px; color: #065f46; margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="c-header">
+    <div class="c-header__inner">
+      <div>
+        <div class="c-header__brand">株式会社結び</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="c-steps">
+    <div class="c-steps__inner">
+      <div class="c-step done"><span class="c-step__num">&#10003;</span><span class="c-step__label">入力</span></div>
+      <div class="c-step done"><span class="c-step__num">&#10003;</span><span class="c-step__label">確認・押印</span></div>
+      <div class="c-step done"><span class="c-step__num">&#10003;</span><span class="c-step__label">決済</span></div>
+      <div class="c-step done active"><span class="c-step__num">&#10003;</span><span class="c-step__label">完了</span></div>
+    </div>
+  </div>
+
+  <div class="complete-wrap">
+    <div class="c-container" style="display:flex; align-items:center; justify-content:center; flex:1;">
+      <div class="c-text-center">
+        <div class="complete-check">&#10003;</div>
+        <div class="complete-title">お手続き完了</div>
+        <p class="complete-text">
+          ご契約のお手続きが完了しました。<br>
+          担当者より改めてご連絡いたしますので、<br>
+          今しばらくお待ちください。
+        </p>
+        <div class="complete-mail">📧 契約書類をメールでお送りしました</div>
+        <div class="complete-divider"></div>
+        <div class="complete-brand">株式会社結び</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
